@@ -7,8 +7,8 @@ import {
   FlipHorizontal,
   RotateCcw,
   MousePointer,
-  Eraser,
   Users,
+  X,
 } from 'lucide-react';
 import PITCH_THEMES from '../../data/pitchThemes';
 import ARROW_STYLES from '../../data/arrowStyles';
@@ -79,10 +79,10 @@ export default function BottomToolbar({ ui, dispatch }) {
         <button
           className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-md transition-all duration-200 cursor-pointer"
           style={{
-            background: !ui.arrowMode && !ui.eraserMode ? 'var(--color-accent)' : 'transparent',
-            color: !ui.arrowMode && !ui.eraserMode ? '#fff' : 'var(--color-txt-secondary)',
+            background: !ui.arrowMode ? 'var(--color-accent)' : 'transparent',
+            color: !ui.arrowMode ? '#fff' : 'var(--color-txt-secondary)',
           }}
-          onClick={() => setUI({ arrowMode: null, eraserMode: false, arrowDrawing: null })}
+          onClick={() => setUI({ arrowMode: null, arrowDrawing: null })}
         >
           <MousePointer size={13} />
         </button>
@@ -100,7 +100,6 @@ export default function BottomToolbar({ ui, dispatch }) {
             onClick={() =>
               setUI({
                 arrowMode: ui.arrowMode === type ? null : type,
-                eraserMode: false,
                 arrowDrawing: null,
               })
             }
@@ -108,19 +107,21 @@ export default function BottomToolbar({ ui, dispatch }) {
             <ArrowRight size={13} /> {label}
           </button>
         ))}
-
-        {/* Eraser */}
-        <button
-          className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-md transition-all duration-200 cursor-pointer"
-          style={{
-            background: ui.eraserMode ? 'rgba(239,68,68,0.2)' : 'transparent',
-            color: ui.eraserMode ? '#EF4444' : 'var(--color-txt-secondary)',
-          }}
-          onClick={() => setUI({ eraserMode: !ui.eraserMode, arrowMode: null, arrowDrawing: null })}
-        >
-          <Eraser size={13} />
-        </button>
       </div>
+
+      {/* Selected arrow actions */}
+      {ui.selectedArrow && (
+        <>
+          <Divider />
+          <button
+            className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+            style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}
+            onClick={() => dispatch({ type: 'REMOVE_ARROW', id: ui.selectedArrow })}
+          >
+            <X size={13} /> Remover Seta
+          </button>
+        </>
+      )}
 
       <Divider />
 

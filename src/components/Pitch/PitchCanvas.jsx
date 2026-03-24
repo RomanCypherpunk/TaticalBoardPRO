@@ -8,17 +8,16 @@ import { PITCH_W, PITCH_H, FL, FT, FW, FH } from './constants';
 
 /**
  * The main pitch area — composes the SVG field, players, arrows, and shirt patterns.
- * Handles arrow drawing clicks and exposes the SVG ref for export.
+ * Handles arrow drawing, selection, and deletion.
  */
-export default function PitchCanvas({
-  teams,
-  arrows,
-  ui,
-  dispatch,
-  svgRef,
-}) {
+export default function PitchCanvas({ teams, arrows, ui, dispatch, svgRef }) {
   const handlePitchClick = useCallback(
     (e) => {
+      // Deselect arrow if clicking on empty pitch
+      if (ui.selectedArrow && !ui.arrowMode) {
+        dispatch({ type: 'SET_UI', updates: { selectedArrow: null } });
+      }
+
       if (!ui.arrowMode) return;
       const svg = svgRef.current;
       if (!svg) return;
@@ -49,22 +48,17 @@ export default function PitchCanvas({
         dispatch({ type: 'SET_UI', updates: { arrowDrawing: null } });
       }
     },
-    [ui.arrowMode, ui.arrowDrawing, dispatch, svgRef]
+    [ui.arrowMode, ui.arrowDrawing, ui.selectedArrow, dispatch, svgRef]
   );
 
   const selectPlayer = (teamId, playerId) => {
     dispatch({
       type: 'SET_UI',
-      updates: { selectedPlayer: { teamId, id: playerId }, selectedTeam: teamId },
+      updates: { selectedPlayer: { teamId, id: playerId }, selectedTeam: teamId, selectedArrow: null },
     });
   };
 
-  const cursorStyle = ui.arrowMode
-    ? 'crosshair'
-    : ui.eraserMode
-    ? 'pointer'
-    : 'default';
-
+  const cursorStyle = ui.arrowMode ? 'crosshair' : 'default';
   const showAway = ui.showAwayTeam;
 
   return (
@@ -83,19 +77,11 @@ export default function PitchCanvas({
         <PitchSVG theme={ui.pitchStyle} />
 
         {/* Shirt pattern definitions */}
-        <ShirtPatternDefs
-          teamId="home"
-          primaryColor={teams.home.primaryColor}
-          secondaryColor={teams.home.secondaryColor}
-          pattern={teams.home.pattern}
-        />
+        <ShirtPatternDefs teamId="home" primaryColor={teams.home.primaryColor}
+          secondaryColor={teams.home.secondaryColor} pattern={teams.home.pattern} />
         {showAway && (
-          <ShirtPatternDefs
-            teamId="away"
-            primaryColor={teams.away.primaryColor}
-            secondaryColor={teams.away.secondaryColor}
-            pattern={teams.away.pattern}
-          />
+          <ShirtPatternDefs teamId="away" primaryColor={teams.away.primaryColor}
+            secondaryColor={teams.away.secondaryColor} pattern={teams.away.pattern} />
         )}
 
         {/* Tactical arrows */}
@@ -103,8 +89,8 @@ export default function PitchCanvas({
           <ArrowSVG
             key={a.id}
             arrow={a}
-            eraserMode={ui.eraserMode}
-            onRemove={(id) => dispatch({ type: 'REMOVE_ARROW', id })}
+            isSelected={ui.selectedArrow === a.id}
+            dispatch={dispatch}
           />
         ))}
 
@@ -137,7 +123,7 @@ export default function PitchCanvas({
           />
         ))}
 
-        {/* Away players (conditionally rendered) */}
+        {/* Away players */}
         {showAway &&
           teams.away.players.map((player) => (
             <PlayerMarker

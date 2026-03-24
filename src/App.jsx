@@ -53,12 +53,16 @@ export default function App() {
   useEffect(() => {
     const handleKey = (e) => {
       if (e.key === 'Escape') {
-        dispatch({ type: 'SET_UI', updates: { arrowDrawing: null, arrowMode: null, eraserMode: false, showPlayerEditor: false } });
+        dispatch({ type: 'SET_UI', updates: { arrowDrawing: null, arrowMode: null, eraserMode: false, selectedArrow: null, showPlayerEditor: false } });
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && ui.selectedArrow) {
+        e.preventDefault();
+        dispatch({ type: 'REMOVE_ARROW', id: ui.selectedArrow });
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, []);
+  }, [ui.selectedArrow]);
 
   // ── Selected player object ──
   const selectedPlayerObj = useMemo(() => {

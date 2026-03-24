@@ -19,6 +19,7 @@ export function createTeamPlayers(formation, isAway) {
     isCaptain: i === 7,
     isKeyPlayer: false,
     colorOverride: null,
+    direction: null,
   }));
 }
 
@@ -58,6 +59,7 @@ export default function initialState() {
       arrowMode: null,
       eraserMode: false,
       arrowDrawing: null,
+      selectedArrow: null,
       showPlayerEditor: false,
     },
   };

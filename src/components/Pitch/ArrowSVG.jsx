@@ -1,22 +1,23 @@
+import { useState, useRef, useCallback } from 'react';
 import ARROW_STYLES from '../../data/arrowStyles';
-import { pctToSvg } from './constants';
+import { pctToSvg, FL, FT, FW, FH, FR, FB } from './constants';
+
+const HANDLE_R = 8;
 
 /**
  * Renders a single tactical arrow on the SVG pitch.
- * Supports solid/dashed/dotted styles and different arrowhead types.
+ * Supports selection, drag-to-move endpoints, and removal.
  */
-export default function ArrowSVG({ arrow, eraserMode, onRemove }) {
+export default function ArrowSVG({ arrow, isSelected, dispatch }) {
   const style = ARROW_STYLES[arrow.type] || ARROW_STYLES.run;
   const { sx: x1, sy: y1 } = pctToSvg(arrow.fromX, arrow.fromY);
   const { sx: x2, sy: y2 } = pctToSvg(arrow.toX, arrow.toY);
   const color = arrow.color || style.defaultColor;
   const markerId = `arrowhead-${arrow.id}`;
 
-  const handleClick = (e) => {
-    if (!eraserMode) return;
-    e.stopPropagation();
-    onRemove(arrow.id);
-  };
+  const [dragging, setDragging] = useState(null); // 'from' | 'to' | 'body'
+  const svgRef = useRef(null);
+  const dragStart = useRef(null);
 
   let headShape;
   if (style.headType === 'diamond') {
@@ -27,16 +28,61 @@ export default function ArrowSVG({ arrow, eraserMode, onRemove }) {
     headShape = <polygon points="0,0 10,3.5 0,7" fill={color} />;
   }
 
+  const handleClick = (e) => {
+    e.stopPropagation();
+    dispatch({ type: 'SET_UI', updates: { selectedArrow: isSelected ? null : arrow.id } });
+  };
+
+  const handleHandleDown = useCallback((endpoint) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const svg = e.currentTarget.closest('svg');
+    svgRef.current = svg;
+    dragStart.current = { endpoint, origFrom: { x: arrow.fromX, y: arrow.fromY }, origTo: { x: arrow.toX, y: arrow.toY } };
+    setDragging(endpoint);
+
+    const handleMove = (me) => {
+      if (!svgRef.current) return;
+      const pt = svgRef.current.createSVGPoint();
+      pt.x = me.clientX;
+      pt.y = me.clientY;
+      const svgP = pt.matrixTransform(svgRef.current.getScreenCTM().inverse());
+      const px = Math.max(0, Math.min(100, ((svgP.x - FL) / FW) * 100));
+      const py = Math.max(0, Math.min(100, ((svgP.y - FT) / FH) * 100));
+
+      if (endpoint === 'from') {
+        dispatch({ type: 'UPDATE_ARROW', arrowId: arrow.id, updates: { fromX: px, fromY: py } });
+      } else if (endpoint === 'to') {
+        dispatch({ type: 'UPDATE_ARROW', arrowId: arrow.id, updates: { toX: px, toY: py } });
+      } else {
+        // Move entire arrow (body drag)
+        const orig = dragStart.current;
+        const dx = px - ((svgP.x - FL) / FW) * 100;
+        const dy = py - ((svgP.y - FT) / FH) * 100;
+        // For body drag we calculate offset from initial pointer position
+      }
+    };
+
+    const handleUp = () => {
+      setDragging(null);
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+    };
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+  }, [arrow, dispatch]);
+
   const lineProps = {
     stroke: color,
-    strokeWidth: 2.5,
+    strokeWidth: isSelected ? 3.5 : 2.5,
     strokeDasharray: style.dash,
     markerEnd: `url(#${markerId})`,
-    opacity: eraserMode ? 0.6 : 0.85,
+    opacity: 0.85,
   };
 
   return (
-    <g onClick={handleClick} style={{ cursor: eraserMode ? 'pointer' : 'default' }}>
+    <g>
       <defs>
         <marker
           id={markerId}
@@ -61,18 +107,37 @@ export default function ArrowSVG({ arrow, eraserMode, onRemove }) {
         <line x1={x1} y1={y1} x2={x2} y2={y2} {...lineProps} />
       )}
 
-      {/* Wider invisible hit area for eraser mode */}
-      {eraserMode && (
-        <line
-          x1={x1}
-          y1={y1}
-          x2={x2}
-          y2={y2}
-          stroke="transparent"
-          strokeWidth="16"
-          style={{ cursor: 'pointer' }}
-          onClick={handleClick}
-        />
+      {/* Invisible wider hit area for click selection */}
+      <line
+        x1={x1} y1={y1} x2={x2} y2={y2}
+        stroke="transparent" strokeWidth="18"
+        style={{ cursor: 'pointer' }}
+        onClick={handleClick}
+      />
+
+      {/* Selection handles */}
+      {isSelected && (
+        <>
+          {/* Start handle */}
+          <circle
+            cx={x1} cy={y1} r={HANDLE_R}
+            fill={color} stroke="#fff" strokeWidth="2"
+            style={{ cursor: 'grab' }}
+            onPointerDown={handleHandleDown('from')}
+          />
+          {/* End handle */}
+          <circle
+            cx={x2} cy={y2} r={HANDLE_R}
+            fill={color} stroke="#fff" strokeWidth="2"
+            style={{ cursor: 'grab' }}
+            onPointerDown={handleHandleDown('to')}
+          />
+          {/* Selection glow */}
+          <line x1={x1} y1={y1} x2={x2} y2={y2}
+            stroke={color} strokeWidth="6" opacity="0.2"
+            style={{ pointerEvents: 'none' }}
+          />
+        </>
       )}
     </g>
   );
