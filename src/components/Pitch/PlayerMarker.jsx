@@ -1,10 +1,167 @@
 import { useState, useRef, useCallback } from 'react';
 import { pctToSvg, FL, FT, FW, FH, FR, FB } from './constants';
-import { getShirtFill } from './ShirtPatternDefs';
 import DIRECTIONS from '../../data/directions';
 
-const R = 18; // marker radius
-const DIR_ARROW_LEN = 32; // direction arrow length from center
+const R = 20; // marker radius
+const DIR_ARROW_LEN = 34;
+
+/**
+ * Renders the SVG pattern defs anchored to the circle's bounding box.
+ * x/y are set to (cx-R, cy-R) so the pattern always starts from the
+ * top-left corner of the circle — regardless of where on the pitch it is.
+ */
+function InlinePatternDefs({ patternKey, primaryColor, secondaryColor, cx, cy, id }) {
+  if (!patternKey || patternKey === 'solid') return null;
+
+  const bx = cx - R;
+  const by = cy - R;
+  const s = R * 2;
+
+  let content;
+  switch (patternKey) {
+    case 'cheques':
+      content = (
+        <>
+          <rect width={s} height={s} fill={primaryColor} />
+          <rect width={s / 2} height={s / 2} fill={secondaryColor} />
+          <rect x={s / 2} y={s / 2} width={s / 2} height={s / 2} fill={secondaryColor} />
+        </>
+      );
+      break;
+
+    case 'half_half_h':
+      content = (
+        <>
+          <rect width={s} height={s / 2} fill={primaryColor} />
+          <rect y={s / 2} width={s} height={s / 2} fill={secondaryColor} />
+        </>
+      );
+      break;
+
+    case 'half_half_v':
+      content = (
+        <>
+          <rect width={s / 2} height={s} fill={primaryColor} />
+          <rect x={s / 2} width={s / 2} height={s} fill={secondaryColor} />
+        </>
+      );
+      break;
+
+    case 'stripes_v':
+      content = (
+        <>
+          <rect width={s} height={s} fill={primaryColor} />
+          {[1, 3, 5].map((i) => (
+            <rect key={i} x={i * (s / 6)} width={s / 6} height={s} fill={secondaryColor} />
+          ))}
+        </>
+      );
+      break;
+
+    case 'stripes_h':
+      content = (
+        <>
+          <rect width={s} height={s} fill={primaryColor} />
+          {[1, 3, 5].map((i) => (
+            <rect key={i} y={i * (s / 6)} width={s} height={s / 6} fill={secondaryColor} />
+          ))}
+        </>
+      );
+      break;
+
+    case 'stripes_thin':
+      content = (
+        <>
+          <rect width={s} height={s} fill={primaryColor} />
+          {[1, 3, 5, 7].map((i) => (
+            <rect key={i} x={i * (s / 8)} width={s / 16} height={s} fill={secondaryColor} />
+          ))}
+        </>
+      );
+      break;
+
+    case 'stripe_diagonal':
+      content = (
+        <>
+          <rect width={s} height={s} fill={primaryColor} />
+          <polygon points={`0,0 ${s * 0.55},0 0,${s * 0.55}`} fill={secondaryColor} />
+          <polygon points={`${s},${s} ${s * 0.45},${s} ${s},${s * 0.45}`} fill={secondaryColor} />
+        </>
+      );
+      break;
+
+    case 'stripe_h':
+      content = (
+        <>
+          <rect width={s} height={s} fill={primaryColor} />
+          <rect y={s * 0.35} width={s} height={s * 0.3} fill={secondaryColor} />
+        </>
+      );
+      break;
+
+    case 'stripe_v':
+      content = (
+        <>
+          <rect width={s} height={s} fill={primaryColor} />
+          <rect x={s * 0.35} width={s * 0.3} height={s} fill={secondaryColor} />
+        </>
+      );
+      break;
+
+    case 'stripe_cut':
+      content = (
+        <>
+          <rect width={s} height={s} fill={secondaryColor} />
+          <polygon points={`0,0 ${s},0 0,${s}`} fill={primaryColor} />
+        </>
+      );
+      break;
+
+    case 'stripe_thick':
+      content = (
+        <>
+          <rect width={s} height={s} fill={primaryColor} />
+          <rect width={s / 3} height={s} fill={secondaryColor} />
+          <rect x={s * 2 / 3} width={s / 3} height={s} fill={secondaryColor} />
+        </>
+      );
+      break;
+
+    case 'quarters':
+      content = (
+        <>
+          <rect width={s / 2} height={s / 2} fill={primaryColor} />
+          <rect x={s / 2} width={s / 2} height={s / 2} fill={secondaryColor} />
+          <rect y={s / 2} width={s / 2} height={s / 2} fill={secondaryColor} />
+          <rect x={s / 2} y={s / 2} width={s / 2} height={s / 2} fill={primaryColor} />
+        </>
+      );
+      break;
+
+    case 'vshape':
+      content = (
+        <>
+          <rect width={s} height={s} fill={primaryColor} />
+          <polygon
+            points={`0,0 ${s / 2},${s * 0.6} ${s},0 ${s},${s * 0.35} ${s / 2},${s * 0.95} 0,${s * 0.35}`}
+            fill={secondaryColor}
+          />
+        </>
+      );
+      break;
+
+    default:
+      return null;
+  }
+
+  return (
+    <defs>
+      <pattern id={id} x={bx} y={by} width={s} height={s} patternUnits="userSpaceOnUse">
+        {content}
+      </pattern>
+    </defs>
+  );
+}
 
 /**
  * Draggable player circle on the SVG pitch.
@@ -25,21 +182,23 @@ export default function PlayerMarker({
   const [dragPos, setDragPos] = useState(null);
   const svgRef = useRef(null);
 
-  // If player has a color override, use solid fill; otherwise use team pattern
-  const hasFillOverride = !!player.colorOverride;
-  const fillColor = hasFillOverride
+  const cx = dragging && dragPos ? dragPos.x : sx;
+  const cy = dragging && dragPos ? dragPos.y : sy;
+
+  const patternId = `ip-${teamId}-${player.id}`;
+  const hasPattern = team.pattern && team.pattern !== 'solid';
+  const fillColor = player.colorOverride
     ? player.colorOverride
-    : getShirtFill(teamId, team.pattern, team.primaryColor);
+    : hasPattern
+    ? `url(#${patternId})`
+    : team.primaryColor;
+
   const textColor = team.numberColor || team.secondaryColor;
 
-  // Determine label based on view mode
   let label = '';
   if (viewMode === 'number') label = String(player.number);
   else if (viewMode === 'name') label = player.name.split(' ').pop().slice(0, 4);
   else label = player.position;
-
-  const cx = dragging && dragPos ? dragPos.x : sx;
-  const cy = dragging && dragPos ? dragPos.y : sy;
 
   const handlePointerDown = useCallback(
     (e) => {
@@ -81,6 +240,9 @@ export default function PlayerMarker({
     setDragPos(null);
   }, [dragging, dragPos, onDragEnd]);
 
+  // Abbreviated surname for the name label below the circle
+  const surname = player.name.split(' ').pop().slice(0, 8);
+
   return (
     <g
       className={dragging ? '' : 'player-transition'}
@@ -90,6 +252,18 @@ export default function PlayerMarker({
       onPointerUp={handlePointerUp}
       aria-label={`${player.name} - ${player.position}`}
     >
+      {/* Inline pattern defs anchored to this circle's position */}
+      {!player.colorOverride && (
+        <InlinePatternDefs
+          patternKey={team.pattern}
+          primaryColor={team.primaryColor}
+          secondaryColor={team.secondaryColor}
+          cx={cx}
+          cy={cy}
+          id={patternId}
+        />
+      )}
+
       {/* Drop shadow */}
       <circle cx={cx + 2} cy={cy + 3} r={R} fill="rgba(0,0,0,0.35)" />
 
@@ -101,7 +275,7 @@ export default function PlayerMarker({
         </circle>
       )}
 
-      {/* Main circle with shirt pattern */}
+      {/* Main circle */}
       <circle cx={cx} cy={cy} r={R} fill={fillColor} stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
 
       {/* Key player glow */}
@@ -111,15 +285,15 @@ export default function PlayerMarker({
         </circle>
       )}
 
-      {/* Label */}
+      {/* Label inside circle */}
       <text
         x={cx}
         y={cy}
         textAnchor="middle"
         dominantBaseline="central"
         fill={textColor}
-        fontSize={viewMode === 'number' ? 12 : 9}
-        fontWeight="700"
+        fontSize={viewMode === 'number' ? 14 : 11}
+        fontWeight="800"
         fontFamily="Inter, sans-serif"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >
@@ -129,10 +303,10 @@ export default function PlayerMarker({
       {/* Captain badge */}
       {player.isCaptain && (
         <g>
-          <circle cx={cx + R * 0.7} cy={cy - R * 0.7} r={7} fill="#FFD700" stroke="rgba(0,0,0,0.3)" strokeWidth="1" />
+          <circle cx={cx + R * 0.72} cy={cy - R * 0.72} r={7} fill="#FFD700" stroke="rgba(0,0,0,0.3)" strokeWidth="1" />
           <text
-            x={cx + R * 0.7}
-            y={cy - R * 0.7}
+            x={cx + R * 0.72}
+            y={cy - R * 0.72}
             textAnchor="middle"
             dominantBaseline="central"
             fill="#000"
@@ -145,22 +319,22 @@ export default function PlayerMarker({
         </g>
       )}
 
-      {/* Player name below marker */}
+      {/* Player name below the circle */}
       <text
         x={cx}
-        y={cy + R + 10}
+        y={cy + R + 12}
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize={8}
+        fontSize={11}
         fontWeight="700"
         fontFamily="Inter, sans-serif"
         fill="white"
-        stroke="rgba(0,0,0,0.75)"
+        stroke="rgba(0,0,0,0.8)"
         strokeWidth={2.5}
         paintOrder="stroke"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >
-        {player.name.split(' ').pop().slice(0, 8)}
+        {surname}
       </text>
 
       {/* Direction arrow */}
@@ -177,12 +351,12 @@ export default function PlayerMarker({
             <defs>
               <marker id={markerId} viewBox="0 0 10 7" refX="10" refY="3.5"
                 markerWidth="7" markerHeight="5" orient="auto-start-reverse">
-                <polygon points="0,0 10,3.5 0,7" fill={fillColor} />
+                <polygon points="0,0 10,3.5 0,7" fill={team.primaryColor} />
               </marker>
             </defs>
             <line
               x1={startX} y1={startY} x2={endX} y2={endY}
-              stroke={fillColor} strokeWidth="2.5" opacity="0.85"
+              stroke={team.primaryColor} strokeWidth="2.5" opacity="0.85"
               markerEnd={`url(#${markerId})`}
             />
           </g>
