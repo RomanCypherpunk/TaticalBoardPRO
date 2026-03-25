@@ -99,8 +99,8 @@ export default async function handler(req, res) {
 
   try {
     // Step 1 — find the most recent completed fixture via season query
-    const currentYear = new Date().getFullYear();
-    const seasons = [currentYear, currentYear - 1];
+    // Free plan only has access to seasons 2022-2024
+    const seasons = [2024, 2023, 2022];
     let fixture = null;
 
     for (const season of seasons) {
