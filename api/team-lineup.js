@@ -1,34 +1,54 @@
 const API_BASE = 'https://v3.football.api-sports.io';
 
 /**
- * Slot templates for 4-3-3 formation (default).
- * Used to assign positions to squad players.
+ * Position mapping from API-Football grid notation to app positions.
  */
-const SLOTS_433 = [
-  { pos: 'GK', group: 'Goalkeeper' },
-  { pos: 'LB', group: 'Defender' },
-  { pos: 'CB', group: 'Defender' },
-  { pos: 'CB', group: 'Defender' },
-  { pos: 'RB', group: 'Defender' },
-  { pos: 'CM', group: 'Midfielder' },
-  { pos: 'CM', group: 'Midfielder' },
-  { pos: 'CM', group: 'Midfielder' },
-  { pos: 'LW', group: 'Attacker' },
-  { pos: 'ST', group: 'Attacker' },
-  { pos: 'RW', group: 'Attacker' },
-];
+const DEFENSE_MAPS = {
+  2: ['CB', 'CB'],
+  3: ['CB', 'CB', 'CB'],
+  4: ['LB', 'CB', 'CB', 'RB'],
+  5: ['LWB', 'CB', 'CB', 'CB', 'RWB'],
+};
+const MIDFIELD_MAPS = {
+  1: ['CDM'],
+  2: ['CM', 'CM'],
+  3: ['CM', 'CM', 'CM'],
+  4: ['LM', 'CM', 'CM', 'RM'],
+  5: ['LWB', 'CM', 'CDM', 'CM', 'RWB'],
+};
+const ATTACK_MID_MAPS = {
+  1: ['CAM'],
+  2: ['CAM', 'CAM'],
+  3: ['LW', 'CAM', 'RW'],
+  4: ['LW', 'CAM', 'CAM', 'RW'],
+};
+const ATTACK_MAPS = {
+  1: ['ST'],
+  2: ['ST', 'ST'],
+  3: ['LW', 'ST', 'RW'],
+  4: ['LW', 'ST', 'ST', 'RW'],
+};
 
-/**
- * Map API-Football position strings to our group keys.
- */
-function normalizeGroup(apiPosition) {
-  if (!apiPosition) return 'Midfielder';
-  const p = apiPosition.toLowerCase();
-  if (p.includes('goal')) return 'Goalkeeper';
-  if (p.includes('def')) return 'Defender';
-  if (p.includes('mid')) return 'Midfielder';
-  if (p.includes('att') || p.includes('for')) return 'Attacker';
-  return 'Midfielder';
+function mapGridToPosition(formation, row, col) {
+  if (row === 1) return 'GK';
+  const layers = formation.split('-').map(Number);
+  const layerIndex = row - 2;
+  if (layerIndex < 0 || layerIndex >= layers.length) return 'CM';
+  const count = layers[layerIndex];
+  const colIdx = col - 1;
+  const totalLayers = layers.length;
+  const isDefense = layerIndex === 0;
+  const isAttack = layerIndex === totalLayers - 1;
+
+  let map;
+  if (isDefense) map = DEFENSE_MAPS[count];
+  else if (isAttack) map = ATTACK_MAPS[count];
+  else if (layerIndex === totalLayers - 2 && totalLayers >= 3)
+    map = ATTACK_MID_MAPS[count] || MIDFIELD_MAPS[count];
+  else map = MIDFIELD_MAPS[count];
+
+  if (!map) return 'CM';
+  return map[Math.min(colIdx, map.length - 1)] || 'CM';
 }
 
 async function apiFetch(path, apiKey) {
@@ -50,6 +70,21 @@ async function apiFetch(path, apiKey) {
   return data;
 }
 
+/**
+ * Find the most recent completed fixture from a list.
+ * Completed statuses: FT, AET, PEN
+ */
+function findLastCompleted(fixtures) {
+  const completed = fixtures.filter((f) => {
+    const s = f.fixture.status?.short;
+    return s === 'FT' || s === 'AET' || s === 'PEN';
+  });
+  if (completed.length === 0) return null;
+  // Sort by date descending and return the most recent
+  completed.sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date));
+  return completed[0];
+}
+
 export default async function handler(req, res) {
   const { teamId } = req.query;
 
@@ -63,77 +98,90 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch full squad — available on free plan
-    const squadData = await apiFetch(`/players/squads?team=${teamId}`, apiKey);
-    const squads = squadData.response;
+    // Step 1 — find the most recent completed fixture via season query
+    const currentYear = new Date().getFullYear();
+    const seasons = [currentYear, currentYear - 1];
+    let fixture = null;
 
-    if (!squads || squads.length === 0 || !squads[0].players?.length) {
-      return res.status(404).json({ error: 'Elenco não encontrado para esse time.' });
+    for (const season of seasons) {
+      const data = await apiFetch(`/fixtures?team=${teamId}&season=${season}`, apiKey);
+      fixture = findLastCompleted(data.response || []);
+      if (fixture) break;
     }
 
-    const allPlayers = squads[0].players;
-
-    // Group players by position
-    const groups = {
-      Goalkeeper: [],
-      Defender: [],
-      Midfielder: [],
-      Attacker: [],
-    };
-
-    for (const p of allPlayers) {
-      const g = normalizeGroup(p.position);
-      groups[g].push(p);
+    if (!fixture) {
+      return res.status(404).json({ error: 'Nenhuma partida finalizada encontrada para esse time.' });
     }
 
-    // Pick 11 starters based on 4-3-3 slot template
-    const picked = [];
-    const used = new Set();
+    const fixtureId = fixture.fixture.id;
+    const isHome = fixture.teams.home.id === Number(teamId);
+    const teamInfo = isHome ? fixture.teams.home : fixture.teams.away;
 
-    for (const slot of SLOTS_433) {
-      const pool = groups[slot.group];
-      const player = pool.find((p) => !used.has(p.id));
-      if (player) {
-        used.add(player.id);
-        picked.push({
-          name: player.name,
-          number: player.number || 0,
-          position: slot.pos,
-        });
-      } else {
-        // Fallback: pick any unused player
-        const fallback = allPlayers.find((p) => !used.has(p.id));
-        if (fallback) {
-          used.add(fallback.id);
-          picked.push({
-            name: fallback.name,
-            number: fallback.number || 0,
-            position: slot.pos,
-          });
-        }
-      }
+    // Step 2 — get lineups for that fixture
+    const lineupsData = await apiFetch(`/fixtures/lineups?fixture=${fixtureId}`, apiKey);
+    const lineups = lineupsData.response;
+
+    if (!lineups || lineups.length === 0) {
+      return res.status(404).json({ error: 'Escalação não disponível para essa partida.' });
     }
+
+    const teamLineup = lineups.find((l) => l.team.id === Number(teamId));
+    if (!teamLineup) {
+      return res.status(404).json({ error: 'Escalação do time não encontrada nessa partida.' });
+    }
+
+    const formation = teamLineup.formation || '4-3-3';
+    const colors = teamLineup.team.colors || {};
+
+    // Normalize colors (API returns without #)
+    const primaryColor = colors.player?.primary ? `#${colors.player.primary}` : null;
+    const numberColor = colors.player?.number ? `#${colors.player.number}` : null;
+    const secondaryColor = colors.player?.border ? `#${colors.player.border}` : null;
 
     // Build short name
-    const teamName = squads[0].team?.name || 'Time';
-    const shortName = teamName
+    const shortName = teamInfo.name
       .replace(/^(FC|CF|SC|AC|AS|RC|CA|SE|CR|CD|UD|RCD|SD|US)\s+/i, '')
       .slice(0, 3)
       .toUpperCase();
 
-    res.setHeader('Cache-Control', 'public, s-maxage=43200, stale-while-revalidate=86400');
+    // Normalize starting XI
+    const startXI = teamLineup.startXI || [];
+    const players = startXI.map((entry) => {
+      const p = entry.player;
+      const grid = p.grid || '1:1';
+      const [gridRow, gridCol] = grid.split(':').map(Number);
+      const position = mapGridToPosition(formation, gridRow, gridCol);
+      return {
+        name: p.name,
+        number: p.number || 0,
+        position,
+      };
+    });
+
+    // Build fixture info
+    const homeScore = fixture.goals?.home ?? '?';
+    const awayScore = fixture.goals?.away ?? '?';
+    const fixtureDate = fixture.fixture.date ? fixture.fixture.date.slice(0, 10) : null;
+
+    res.setHeader('Cache-Control', 'public, s-maxage=21600, stale-while-revalidate=43200');
     return res.status(200).json({
       team: {
-        name: teamName,
+        name: teamInfo.name,
         shortName,
-        primaryColor: null,
-        secondaryColor: null,
-        numberColor: null,
-        formation: '4-3-3',
-        logo: squads[0].team?.logo || null,
+        primaryColor,
+        secondaryColor,
+        numberColor,
+        formation,
+        logo: teamInfo.logo,
       },
-      players: picked,
-      fixture: null,
+      players,
+      fixture: {
+        id: fixtureId,
+        date: fixtureDate,
+        home: fixture.teams.home.name,
+        away: fixture.teams.away.name,
+        score: `${homeScore}-${awayScore}`,
+      },
     });
   } catch (err) {
     if (err.status === 429) {
