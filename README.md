@@ -250,17 +250,7 @@ A saída vai para `dist/`. A aplicação é completamente estática — pode ser
 
 ---
 
-## Roadmap
+## Autor
 
-- [ ] Exportação como PNG (conversão SVG para canvas)
-- [ ] Setas curvas com ponto de controle bezier arrastável
-- [ ] Banco de dados de times com cores reais de clubes
-- [ ] Reprodução de animação (sequência de movimentos táticos)
-- [ ] Link compartilhável via estado codificado na URL
-- [ ] Histórico de desfazer/refazer
-
----
-
-## Licença
-
-MIT
+**Enzo Xavier Santos**
+Desenvolvedor de Software - 2026
