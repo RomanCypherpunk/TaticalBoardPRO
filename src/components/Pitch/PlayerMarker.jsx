@@ -195,10 +195,6 @@ export default function PlayerMarker({
 
   const textColor = team.numberColor || team.secondaryColor;
 
-  let label = '';
-  if (viewMode === 'number') label = String(player.number);
-  else if (viewMode === 'name') label = player.name.split(' ').pop().slice(0, 4);
-  else label = player.position;
 
   const handlePointerDown = useCallback(
     (e) => {
@@ -239,9 +235,6 @@ export default function PlayerMarker({
     }
     setDragPos(null);
   }, [dragging, dragPos, onDragEnd]);
-
-  // Abbreviated surname for the name label below the circle
-  const surname = player.name.split(' ').pop().slice(0, 8);
 
   return (
     <g
@@ -285,19 +278,19 @@ export default function PlayerMarker({
         </circle>
       )}
 
-      {/* Label inside circle */}
+      {/* Number inside circle */}
       <text
         x={cx}
         y={cy}
         textAnchor="middle"
         dominantBaseline="central"
         fill={textColor}
-        fontSize={viewMode === 'number' ? 14 : 11}
+        fontSize={15}
         fontWeight="800"
         fontFamily="Inter, sans-serif"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >
-        {label}
+        {String(player.number)}
       </text>
 
       {/* Captain badge */}
@@ -319,23 +312,41 @@ export default function PlayerMarker({
         </g>
       )}
 
-      {/* Player name below the circle */}
-      <text
-        x={cx}
-        y={cy + R + 12}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={11}
-        fontWeight="700"
-        fontFamily="Inter, sans-serif"
-        fill="white"
-        stroke="rgba(0,0,0,0.8)"
-        strokeWidth={2.5}
-        paintOrder="stroke"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {surname}
-      </text>
+      {/* Player name badge below the circle */}
+      {(() => {
+        const nameText = player.name.toUpperCase();
+        const charW = 5.8;
+        const padX = 6;
+        const rectW = nameText.length * charW + padX * 2;
+        const rectH = 14;
+        const labelY = cy + R + 11;
+        return (
+          <g style={{ pointerEvents: 'none', userSelect: 'none' }}>
+            <rect
+              x={cx - rectW / 2}
+              y={labelY - rectH / 2}
+              width={rectW}
+              height={rectH}
+              rx={2}
+              fill={team.primaryColor}
+              opacity={0.92}
+            />
+            <text
+              x={cx}
+              y={labelY}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={9.5}
+              fontWeight="700"
+              fontFamily="Inter, sans-serif"
+              fill={textColor}
+              letterSpacing="0.3"
+            >
+              {nameText}
+            </text>
+          </g>
+        );
+      })()}
 
       {/* Direction arrow */}
       {player.direction && (() => {
