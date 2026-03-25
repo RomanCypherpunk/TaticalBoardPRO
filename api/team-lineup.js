@@ -57,11 +57,19 @@ async function apiFetch(path, apiKey) {
     headers: { 'x-apisports-key': apiKey },
   });
   if (!res.ok) {
-    const err = new Error(`API-Football ${res.status}`);
+    const err = new Error(`API-Football HTTP ${res.status}`);
     err.status = res.status;
     throw err;
   }
-  return res.json();
+  const data = await res.json();
+  // API-Football returns errors inside the JSON body, not via HTTP status
+  if (data.errors && Object.keys(data.errors).length > 0) {
+    const msg = Object.values(data.errors).join('; ');
+    const err = new Error(msg);
+    err.status = 403;
+    throw err;
+  }
+  return data;
 }
 
 export default async function handler(req, res) {
@@ -78,10 +86,29 @@ export default async function handler(req, res) {
 
   try {
     // Step 1 — get last fixture for this team
-    const fixturesData = await apiFetch(`/fixtures?team=${teamId}&last=1`, apiKey);
-    const fixtures = fixturesData.response;
+    // Try with last=1 first, then fallback to current season
+    let fixturesData = await apiFetch(`/fixtures?team=${teamId}&last=1`, apiKey);
+    let fixtures = fixturesData.response;
+
+    // If no results, try with current season explicitly
     if (!fixtures || fixtures.length === 0) {
-      return res.status(404).json({ error: 'Nenhuma partida recente encontrada para esse time.' });
+      const currentYear = new Date().getFullYear();
+      fixturesData = await apiFetch(`/fixtures?team=${teamId}&season=${currentYear}&last=1`, apiKey);
+      fixtures = fixturesData.response;
+    }
+
+    // Still no results, try previous year (season might not have started)
+    if (!fixtures || fixtures.length === 0) {
+      const prevYear = new Date().getFullYear() - 1;
+      fixturesData = await apiFetch(`/fixtures?team=${teamId}&season=${prevYear}&last=1`, apiKey);
+      fixtures = fixturesData.response;
+    }
+
+    if (!fixtures || fixtures.length === 0) {
+      return res.status(404).json({
+        error: 'Nenhuma partida recente encontrada para esse time.',
+        debug: { teamId, results: fixturesData.results, paging: fixturesData.paging },
+      });
     }
 
     const fixture = fixtures[0];
@@ -162,6 +189,6 @@ export default async function handler(req, res) {
     if (err.status === 429) {
       return res.status(429).json({ error: 'Limite de requisições atingido. Tente novamente mais tarde.' });
     }
-    return res.status(502).json({ error: 'Erro ao consultar API externa.' });
+    return res.status(502).json({ error: err.message || 'Erro ao consultar API externa.' });
   }
 }
