@@ -3,8 +3,8 @@ import { FB, FH, FL, FR, FT, FW, pctToSvg } from './constants';
 import DIRECTIONS from '../../data/directions';
 import { buildFotmobPlayerPhotoUrl } from '../../utils/fotmob';
 
-const RADIUS = 18;
-const DIRECTION_ARROW_LENGTH = 30;
+const RADIUS = 24;
+const DIRECTION_ARROW_LENGTH = 38;
 
 function InlinePatternDefs({ patternKey, primaryColor, secondaryColor, cx, cy, id }) {
   if (!patternKey || patternKey === 'solid') return null;
@@ -266,33 +266,33 @@ export default function PlayerMarker({
   }, [dragging, dragPos, onDragEnd]);
 
   let markerText = String(player.number);
-  let markerFontSize = 14;
+  let markerFontSize = 17;
   let markerWeight = 800;
   let showNameBadge = false;
 
   if (viewMode === 'name') {
     markerText = getPlayerInitials(player.name);
-    markerFontSize = 11.5;
+    markerFontSize = 14;
     markerWeight = 700;
     showNameBadge = true;
   } else if (viewMode === 'position') {
     markerText = player.position;
-    markerFontSize = player.position.length >= 3 ? 10.5 : 12.5;
+    markerFontSize = player.position.length >= 3 ? 12.5 : 14.5;
     markerWeight = 800;
   } else if (viewMode === 'photo' && !showPhoto) {
     markerText = getPlayerInitials(player.name);
-    markerFontSize = 11.5;
+    markerFontSize = 14;
     markerWeight = 700;
   }
 
   const nameBadgeText = getNameBadgeText(player.name);
-  const charWidth = 5.8;
-  const badgePadding = 7;
+  const charWidth = 6.6;
+  const badgePadding = 8;
   const badgeWidth = nameBadgeText.length * charWidth + badgePadding * 2;
-  const badgeHeight = 15;
-  const defaultBadgeY = cy + RADIUS + 12;
+  const badgeHeight = 18;
+  const defaultBadgeY = cy + RADIUS + 14;
   const badgeY =
-    defaultBadgeY + badgeHeight / 2 > FB - 5 ? cy - RADIUS - 12 : defaultBadgeY;
+    defaultBadgeY + badgeHeight / 2 > FB - 5 ? cy - RADIUS - 14 : defaultBadgeY;
 
   return (
     <g
@@ -377,9 +377,9 @@ export default function PlayerMarker({
       {showPhoto && (
         <g style={{ pointerEvents: 'none' }}>
           <circle
-            cx={cx + RADIUS * 0.8}
-            cy={cy + RADIUS * 0.75}
-            r={7.5}
+            cx={cx + RADIUS * 0.82}
+            cy={cy + RADIUS * 0.76}
+            r={9}
             fill={team.primaryColor}
             stroke="rgba(0,0,0,0.35)"
             strokeWidth="1"
@@ -390,7 +390,7 @@ export default function PlayerMarker({
             textAnchor="middle"
             dominantBaseline="central"
             fill={textColor}
-            fontSize="8"
+            fontSize="10"
             fontWeight="800"
             fontFamily="Sora, sans-serif"
           >
@@ -404,7 +404,7 @@ export default function PlayerMarker({
           <circle
             cx={cx + RADIUS * 0.72}
             cy={cy - RADIUS * 0.72}
-            r={7}
+            r={8}
             fill="#FFD700"
             stroke="rgba(0,0,0,0.3)"
             strokeWidth="1"
@@ -415,7 +415,7 @@ export default function PlayerMarker({
             textAnchor="middle"
             dominantBaseline="central"
             fill="#000"
-            fontSize="8"
+            fontSize="9"
             fontWeight="900"
             fontFamily="Sora, sans-serif"
             style={{ pointerEvents: 'none' }}
@@ -441,7 +441,7 @@ export default function PlayerMarker({
             y={badgeY}
             textAnchor="middle"
             dominantBaseline="central"
-            fontSize={9}
+            fontSize={10.5}
             fontWeight="700"
             fontFamily="Sora, sans-serif"
             fill={textColor}
