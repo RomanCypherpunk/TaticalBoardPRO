@@ -52,18 +52,19 @@ const USUAL_POS_FALLBACK = {
   3: 'ST',
 };
 
-const FALLBACK_SLOTS = ['GK', 'LB', 'CB', 'CB', 'RB', 'CM', 'CM', 'CM', 'LW', 'ST', 'RW'];
-
-const SLOT_PREFERENCES = {
-  GK: ['GK'],
-  LB: ['LB', 'LWB', 'CB'],
-  CB: ['CB', 'LB', 'RB', 'LWB', 'RWB'],
-  RB: ['RB', 'RWB', 'CB'],
-  CM: ['CM', 'CDM', 'CAM', 'LM', 'RM'],
-  LW: ['LW', 'LM', 'RW', 'CAM', 'ST', 'CF'],
-  ST: ['ST', 'CF', 'SS', 'CAM', 'RW', 'LW'],
-  RW: ['RW', 'RM', 'LW', 'CAM', 'ST', 'CF'],
-};
+const SQUAD_FALLBACK_TEMPLATE = [
+  { slot: 'GK', group: 'keepers' },
+  { slot: 'RB', group: 'defenders' },
+  { slot: 'CB', group: 'defenders' },
+  { slot: 'CB', group: 'defenders' },
+  { slot: 'LB', group: 'defenders' },
+  { slot: 'CM', group: 'midfielders' },
+  { slot: 'CDM', group: 'midfielders' },
+  { slot: 'CM', group: 'midfielders' },
+  { slot: 'RW', group: 'attackers' },
+  { slot: 'ST', group: 'attackers' },
+  { slot: 'LW', group: 'attackers' },
+];
 
 function mapPosition(positionId, usualPosId) {
   return POSITION_ID_MAP[positionId] || USUAL_POS_FALLBACK[usualPosId] || 'CM';
@@ -98,49 +99,81 @@ function normalizePlayer(member, fallbackIndex = 0) {
   };
 }
 
+function classifySquadGroup(title) {
+  const normalized = String(title || '').toLowerCase();
+
+  if (normalized.includes('keeper') || normalized.includes('goalkeeper')) return 'keepers';
+  if (normalized.includes('defender') || normalized.includes('back')) return 'defenders';
+  if (normalized.includes('midfielder') || normalized.includes('midfield')) return 'midfielders';
+  if (
+    normalized.includes('attacker') ||
+    normalized.includes('forward') ||
+    normalized.includes('striker')
+  ) {
+    return 'attackers';
+  }
+
+  return null;
+}
+
 function buildSquadLineup(squadGroups) {
   if (!Array.isArray(squadGroups) || squadGroups.length === 0) return null;
 
+  const grouped = {
+    keepers: [],
+    defenders: [],
+    midfielders: [],
+    attackers: [],
+  };
+  const overflow = [];
   const seen = new Set();
-  const roster = squadGroups
-    .flatMap((group) => group?.members || [])
-    .filter((member) => member?.name && member?.role !== 'coach')
-    .map(normalizePlayer)
-    .filter((player) => {
-      const key = player.fotmobId || player.name;
-      if (seen.has(key)) return false;
+
+  squadGroups.forEach((group) => {
+    const bucket = classifySquadGroup(group?.title);
+    const members = Array.isArray(group?.members) ? group.members : [];
+
+    members.forEach((member, index) => {
+      if (!member?.name || member?.role === 'coach') return;
+
+      const key = member.id || member.name;
+      if (seen.has(key)) return;
       seen.add(key);
-      return true;
+
+      const normalizedPlayer = normalizePlayer(member, index);
+
+      if (bucket) {
+        grouped[bucket].push(normalizedPlayer);
+      } else {
+        overflow.push(normalizedPlayer);
+      }
     });
+  });
 
-  if (roster.length === 0) return null;
+  const totalPlayers =
+    grouped.keepers.length +
+    grouped.defenders.length +
+    grouped.midfielders.length +
+    grouped.attackers.length +
+    overflow.length;
 
-  const remaining = [...roster];
+  if (totalPlayers === 0) return null;
 
-  return FALLBACK_SLOTS.map((slot, index) => {
-    const preferredPositions = SLOT_PREFERENCES[slot] || [slot];
-    let playerIndex = remaining.findIndex((player) =>
-      preferredPositions.includes(player.position)
-    );
-
-    if (playerIndex === -1 && slot === 'GK') {
-      playerIndex = remaining.findIndex((player) => player.position === 'GK');
-    }
-
-    if (playerIndex === -1) {
-      playerIndex = remaining.findIndex((player) => player.position !== 'GK' || slot === 'GK');
-    }
-
-    const picked =
-      playerIndex === -1
-        ? normalizePlayer(null, index)
-        : remaining.splice(playerIndex, 1)[0];
+  return SQUAD_FALLBACK_TEMPLATE.map(({ slot, group }, index) => {
+    const primaryPool = grouped[group];
+    const player =
+      primaryPool.shift() ||
+      overflow.shift() ||
+      grouped.defenders.shift() ||
+      grouped.midfielders.shift() ||
+      grouped.attackers.shift() ||
+      grouped.keepers.shift() ||
+      normalizePlayer(null, index);
 
     return {
-      fotmobId: picked.fotmobId,
-      name: picked.name,
-      number: picked.number,
-      position: picked.position || slot,
+      fotmobId: player.fotmobId,
+      name: player.name,
+      number: player.number,
+      position: slot,
     };
   });
 }

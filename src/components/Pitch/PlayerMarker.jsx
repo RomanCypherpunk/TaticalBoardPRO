@@ -340,12 +340,14 @@ export default function PlayerMarker({
       {showPhoto && (
         <image
           href={photoUrl}
+          xlinkHref={photoUrl}
           x={cx - RADIUS}
           y={cy - RADIUS}
           width={RADIUS * 2}
           height={RADIUS * 2}
           clipPath={`url(#${photoClipId})`}
           preserveAspectRatio="xMidYMid slice"
+          imageRendering="auto"
           onError={() => setPhotoFailed(true)}
         />
       )}

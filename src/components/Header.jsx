@@ -10,12 +10,12 @@ export default function Header({ onSave, onExport }) {
 
       <div className="flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
-          <img src="/logo.png" alt="Tactical Board" className="h-10 w-10 object-contain" />
+          <img src="/logo.png" alt="Tatical Board Pro" className="h-10 w-10 object-contain" />
         </div>
 
         <div className="min-w-0">
           <h1 className="font-display text-sm uppercase tracking-[0.34em] text-txt-primary">
-            Tactical Board
+            Tatical Board Pro
           </h1>
           <p className="text-xs text-txt-secondary">
             Analise tatica pronta para estudo, apresentacao e post.
@@ -35,14 +35,14 @@ export default function Header({ onSave, onExport }) {
           className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-txt-primary transition-all duration-200 hover:bg-white/10"
           onClick={() => onExport('png')}
         >
-          <Download size={14} /> PNG
+          <Download size={14} /> Exportar PNG
         </button>
 
         <button
           className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs text-white transition-all duration-200 hover:bg-accent-hover"
           onClick={() => onExport('jpg')}
         >
-          <Download size={14} /> JPG
+          <Download size={14} /> Exportar JPG
         </button>
       </div>
     </header>

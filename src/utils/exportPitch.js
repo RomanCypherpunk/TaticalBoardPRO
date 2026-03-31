@@ -50,8 +50,21 @@ function downloadBlob(blob, filename) {
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = filename;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(anchor);
+  window.setTimeout(() => URL.revokeObjectURL(url), 250);
+}
+
+function downloadDataUrl(dataUrl, filename) {
+  const anchor = document.createElement('a');
+  anchor.href = dataUrl;
+  anchor.download = filename;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
 }
 
 export async function exportPitchRaster(svgElement, format = 'png') {
@@ -104,6 +117,8 @@ export async function exportPitchRaster(svgElement, format = 'png') {
 
     if (outputBlob) {
       downloadBlob(outputBlob, `tatica.${extension}`);
+    } else {
+      downloadDataUrl(canvas.toDataURL(mimeType, 0.94), `tatica.${extension}`);
     }
   } finally {
     URL.revokeObjectURL(svgUrl);
