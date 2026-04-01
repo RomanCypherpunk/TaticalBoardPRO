@@ -12,7 +12,7 @@ import DIRECTIONS from '../../data/directions';
 import { buildFotmobPlayerPhotoUrl } from '../../utils/fotmob';
 
 const REFERENCE_RADIUS = 24;
-const MARKER_RADIUS = 48;
+const MARKER_RADIUS = 32;
 const BASE_DIRECTION_ARROW_LENGTH = 38;
 
 function InlinePatternDefs({ patternKey, primaryColor, secondaryColor, cx, cy, id, radius }) {
