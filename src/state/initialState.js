@@ -3,8 +3,15 @@ import { DEFAULT_NAMES, DEFAULT_NUMBERS } from '../data/defaults';
 
 /**
  * Creates the 11 players for a team based on a formation.
- * Away team players get y-flipped so they appear on the opposite half.
+ * Away team players get a 180° rotation so left/right roles stay correct.
  */
+export function orientFormationPosition(position, isAway) {
+  return {
+    x: isAway ? 100 - position.x : position.x,
+    y: isAway ? 100 - position.y : position.y,
+  };
+}
+
 export function createTeamPlayers(formation, isAway) {
   const f = FORMATIONS[formation];
   return f.positions.map((p, i) => ({
@@ -15,8 +22,7 @@ export function createTeamPlayers(formation, isAway) {
     position: p.pos,
     role: '',
     instruction: '',
-    x: p.x,
-    y: isAway ? 100 - p.y : p.y,
+    ...orientFormationPosition(p, isAway),
     isCaptain: i === 7,
     isKeyPlayer: false,
     colorOverride: null,

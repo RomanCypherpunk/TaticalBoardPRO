@@ -1,5 +1,5 @@
 import FORMATIONS from '../data/formations';
-import initialState from './initialState';
+import initialState, { orientFormationPosition } from './initialState';
 
 function mergeLoadedState(loadedState) {
   const baseState = initialState();
@@ -48,8 +48,7 @@ export default function reducer(state, action) {
       const newPlayers = f.positions.map((p, i) => ({
         ...oldPlayers[i],
         position: p.pos,
-        x: p.x,
-        y: isAway ? 100 - p.y : p.y,
+        ...orientFormationPosition(p, isAway),
       }));
       return {
         ...state,
@@ -130,7 +129,7 @@ export default function reducer(state, action) {
 
     case 'FLIP_SIDES': {
       const flipPlayers = (players) =>
-        players.map((p) => ({ ...p, x: p.x, y: 100 - p.y }));
+        players.map((p) => ({ ...p, x: 100 - p.x, y: 100 - p.y }));
       return {
         ...state,
         teams: {
@@ -145,13 +144,11 @@ export default function reducer(state, action) {
       const awayF = FORMATIONS[state.teams.away.formation];
       const resetHome = state.teams.home.players.map((p, i) => ({
         ...p,
-        x: homeF.positions[i].x,
-        y: homeF.positions[i].y,
+        ...orientFormationPosition(homeF.positions[i], false),
       }));
       const resetAway = state.teams.away.players.map((p, i) => ({
         ...p,
-        x: awayF.positions[i].x,
-        y: 100 - awayF.positions[i].y,
+        ...orientFormationPosition(awayF.positions[i], true),
       }));
       return {
         ...state,
@@ -194,8 +191,7 @@ export default function reducer(state, action) {
         position: apiPlayers[i]?.position || pos.pos,
         role: '',
         instruction: '',
-        x: pos.x,
-        y: isAway ? 100 - pos.y : pos.y,
+        ...orientFormationPosition(pos, isAway),
         isCaptain: false,
         isKeyPlayer: false,
         colorOverride: null,
