@@ -1,6 +1,25 @@
 import FORMATIONS from '../data/formations';
 import initialState, { orientFormationPosition } from './initialState';
 
+const POSITION_PREFERENCES = {
+  GK: ['GK'],
+  LB: ['LB', 'LWB', 'LM', 'LW', 'CB', 'RB'],
+  RB: ['RB', 'RWB', 'RM', 'RW', 'CB', 'LB'],
+  LWB: ['LWB', 'LB', 'LM', 'LW', 'CB'],
+  RWB: ['RWB', 'RB', 'RM', 'RW', 'CB'],
+  CB: ['CB', 'CDM', 'LB', 'RB', 'LWB', 'RWB'],
+  CDM: ['CDM', 'CM', 'CAM', 'CB'],
+  CM: ['CM', 'CDM', 'CAM', 'LM', 'RM'],
+  CAM: ['CAM', 'CM', 'CF', 'SS', 'ST'],
+  LM: ['LM', 'LW', 'LWB', 'LB', 'CM'],
+  RM: ['RM', 'RW', 'RWB', 'RB', 'CM'],
+  LW: ['LW', 'LM', 'LWB', 'LB', 'CF', 'ST'],
+  RW: ['RW', 'RM', 'RWB', 'RB', 'CF', 'ST'],
+  CF: ['CF', 'ST', 'SS', 'CAM', 'LW', 'RW'],
+  SS: ['SS', 'CF', 'ST', 'CAM'],
+  ST: ['ST', 'CF', 'SS', 'CAM', 'LW', 'RW'],
+};
+
 function mergeLoadedState(loadedState) {
   const baseState = initialState();
 
@@ -27,6 +46,80 @@ function mergeLoadedState(loadedState) {
   };
 }
 
+function normalizePosition(position) {
+  return String(position || '').trim().toUpperCase();
+}
+
+function getPositionScore(slotPosition, playerPosition) {
+  const slot = normalizePosition(slotPosition);
+  const player = normalizePosition(playerPosition);
+  const preferences = POSITION_PREFERENCES[slot] || [slot];
+  const exactMatchIndex = preferences.indexOf(player);
+
+  if (exactMatchIndex !== -1) return exactMatchIndex;
+  if (!player) return Number.POSITIVE_INFINITY;
+
+  if (['CM', 'CDM', 'CAM'].includes(slot) && ['CM', 'CDM', 'CAM'].includes(player)) {
+    return preferences.length + 1;
+  }
+
+  if (['LW', 'LM'].includes(slot) && ['LW', 'LM', 'LWB', 'LB'].includes(player)) {
+    return preferences.length + 2;
+  }
+
+  if (['RW', 'RM'].includes(slot) && ['RW', 'RM', 'RWB', 'RB'].includes(player)) {
+    return preferences.length + 2;
+  }
+
+  if (['CF', 'SS', 'ST'].includes(slot) && ['CF', 'SS', 'ST', 'CAM'].includes(player)) {
+    return preferences.length + 3;
+  }
+
+  return Number.POSITIVE_INFINITY;
+}
+
+function orderPlayersForFormation(players, formation) {
+  const slots = FORMATIONS[formation]?.positions || [];
+  const pool = Array.isArray(players)
+    ? players.map((player, index) => ({ ...player, __originalIndex: index }))
+    : [];
+
+  return slots.map((slot) => {
+    let bestPoolIndex = -1;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    pool.forEach((candidate, candidateIndex) => {
+      if (!candidate) return;
+
+      const score = getPositionScore(slot.pos, candidate.position);
+      const currentBest = bestPoolIndex === -1 ? null : pool[bestPoolIndex];
+
+      if (
+        score < bestScore ||
+        (score === bestScore &&
+          currentBest &&
+          candidate.__originalIndex < currentBest.__originalIndex)
+      ) {
+        bestScore = score;
+        bestPoolIndex = candidateIndex;
+      }
+    });
+
+    if (bestPoolIndex === -1 || !Number.isFinite(bestScore)) {
+      bestPoolIndex = pool.findIndex(Boolean);
+    }
+
+    if (bestPoolIndex === -1) return null;
+
+    const selected = pool[bestPoolIndex];
+    pool[bestPoolIndex] = null;
+
+    if (!selected) return null;
+    const { __originalIndex, ...player } = selected;
+    return player;
+  });
+}
+
 export default function reducer(state, action) {
   switch (action.type) {
     case 'SET_TEAM_FIELD': {
@@ -44,7 +137,7 @@ export default function reducer(state, action) {
       const { teamId, formation } = action;
       const isAway = teamId === 'away';
       const f = FORMATIONS[formation];
-      const oldPlayers = state.teams[teamId].players;
+      const oldPlayers = orderPlayersForFormation(state.teams[teamId].players, formation);
       const newPlayers = f.positions.map((p, i) => ({
         ...oldPlayers[i],
         position: p.pos,
@@ -142,11 +235,21 @@ export default function reducer(state, action) {
     case 'RESET_POSITIONS': {
       const homeF = FORMATIONS[state.teams.home.formation];
       const awayF = FORMATIONS[state.teams.away.formation];
-      const resetHome = state.teams.home.players.map((p, i) => ({
+      const orderedHomePlayers = orderPlayersForFormation(
+        state.teams.home.players,
+        state.teams.home.formation
+      );
+      const orderedAwayPlayers = orderPlayersForFormation(
+        state.teams.away.players,
+        state.teams.away.formation
+      );
+      const resetHome = orderedHomePlayers.map((p, i) => ({
+        ...state.teams.home.players[i],
         ...p,
         ...orientFormationPosition(homeF.positions[i], false),
       }));
-      const resetAway = state.teams.away.players.map((p, i) => ({
+      const resetAway = orderedAwayPlayers.map((p, i) => ({
+        ...state.teams.away.players[i],
         ...p,
         ...orientFormationPosition(awayF.positions[i], true),
       }));
@@ -182,13 +285,14 @@ export default function reducer(state, action) {
       const resolvedFormation = FORMATIONS[teamData.formation] ? teamData.formation : '4-3-3';
       const f = FORMATIONS[resolvedFormation];
       const idOffset = isAway ? 100 : 0;
+      const orderedApiPlayers = orderPlayersForFormation(apiPlayers, resolvedFormation);
 
       const newPlayers = f.positions.map((pos, i) => ({
         id: idOffset + i + 1,
-        name: apiPlayers[i]?.name || `Jogador ${i + 1}`,
-        number: apiPlayers[i]?.number || i + 1,
-        fotmobId: apiPlayers[i]?.fotmobId || null,
-        position: apiPlayers[i]?.position || pos.pos,
+        name: orderedApiPlayers[i]?.name || `Jogador ${i + 1}`,
+        number: orderedApiPlayers[i]?.number || i + 1,
+        fotmobId: orderedApiPlayers[i]?.fotmobId || null,
+        position: orderedApiPlayers[i]?.position || pos.pos,
         role: '',
         instruction: '',
         ...orientFormationPosition(pos, isAway),

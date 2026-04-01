@@ -3,9 +3,9 @@
  */
 export const DEFAULT_NAMES = [
   'Goleiro',
-  'Zagueiro',
-  'Zagueiro',
   'Lateral Esquerdo',
+  'Zagueiro',
+  'Zagueiro',
   'Lateral Direito',
   'Volante',
   'Meia',
@@ -15,4 +15,4 @@ export const DEFAULT_NAMES = [
   'Ponta Direita',
 ];
 
-export const DEFAULT_NUMBERS = [1, 3, 4, 6, 2, 5, 8, 10, 11, 9, 7];
+export const DEFAULT_NUMBERS = [1, 6, 3, 4, 2, 5, 8, 10, 11, 9, 7];
