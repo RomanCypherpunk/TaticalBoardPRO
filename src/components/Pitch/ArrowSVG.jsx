@@ -1,7 +1,12 @@
 import { useState, useRef, useCallback } from 'react';
 import ARROW_STYLES from '../../data/arrowStyles';
 import { pctToSvg } from './constants';
-import { canonicalToPercent, clampToPitch, eventToCanonicalPoint } from './geometry';
+import {
+  canonicalToDisplayPoint,
+  canonicalToPercent,
+  clampToPitch,
+  eventToCanonicalPoint,
+} from './geometry';
 
 const HANDLE_R = 8;
 
@@ -11,8 +16,18 @@ const HANDLE_R = 8;
  */
 export default function ArrowSVG({ arrow, isSelected, dispatch, pitchOrientation }) {
   const style = ARROW_STYLES[arrow.type] || ARROW_STYLES.run;
-  const { sx: x1, sy: y1 } = pctToSvg(arrow.fromX, arrow.fromY);
-  const { sx: x2, sy: y2 } = pctToSvg(arrow.toX, arrow.toY);
+  const fromPoint = canonicalToDisplayPoint(
+    pctToSvg(arrow.fromX, arrow.fromY).sx,
+    pctToSvg(arrow.fromX, arrow.fromY).sy,
+    pitchOrientation
+  );
+  const toPoint = canonicalToDisplayPoint(
+    pctToSvg(arrow.toX, arrow.toY).sx,
+    pctToSvg(arrow.toX, arrow.toY).sy,
+    pitchOrientation
+  );
+  const { x: x1, y: y1 } = fromPoint;
+  const { x: x2, y: y2 } = toPoint;
   const color = arrow.color || style.defaultColor;
   const markerId = `arrowhead-${arrow.id}`;
 

@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FB, FL, FR, pctToSvg } from './constants';
-import { canonicalToPercent, clampToPitch, eventToCanonicalPoint } from './geometry';
+import { pctToSvg } from './constants';
+import {
+  canonicalToDisplayPoint,
+  canonicalToPercent,
+  clampToPitch,
+  eventToCanonicalPoint,
+  getDisplayPitchBounds,
+  vectorToDisplay,
+} from './geometry';
 import DIRECTIONS from '../../data/directions';
 import { buildFotmobPlayerPhotoUrl } from '../../utils/fotmob';
 
-const BASE_RADIUS = 24;
-const PHOTO_RADIUS = BASE_RADIUS * 2;
+const REFERENCE_RADIUS = 24;
+const MARKER_RADIUS = 48;
 const BASE_DIRECTION_ARROW_LENGTH = 38;
 
 function InlinePatternDefs({ patternKey, primaryColor, secondaryColor, cx, cy, id, radius }) {
@@ -207,12 +214,17 @@ export default function PlayerMarker({
     setPhotoFailed(false);
   }, [player.fotmobId, viewMode]);
 
-  const cx = dragging && dragPos ? dragPos.x : sx;
-  const cy = dragging && dragPos ? dragPos.y : sy;
-  const markerRadius = viewMode === 'photo' ? PHOTO_RADIUS : BASE_RADIUS;
-  const scaleFactor = markerRadius / BASE_RADIUS;
-  const directionArrowLength =
-    viewMode === 'photo' ? BASE_DIRECTION_ARROW_LENGTH * 1.6 : BASE_DIRECTION_ARROW_LENGTH;
+  const currentCanonicalX = dragging && dragPos ? dragPos.x : sx;
+  const currentCanonicalY = dragging && dragPos ? dragPos.y : sy;
+  const { x: cx, y: cy } = canonicalToDisplayPoint(
+    currentCanonicalX,
+    currentCanonicalY,
+    pitchOrientation
+  );
+  const pitchBounds = getDisplayPitchBounds(pitchOrientation);
+  const markerRadius = MARKER_RADIUS;
+  const scaleFactor = markerRadius / REFERENCE_RADIUS;
+  const directionArrowLength = BASE_DIRECTION_ARROW_LENGTH * scaleFactor;
 
   const patternId = `pattern-${teamId}-${player.id}`;
   const photoClipId = `photo-clip-${teamId}-${player.id}`;
@@ -291,10 +303,12 @@ export default function PlayerMarker({
   const badgeHeight = 18 * scaleFactor;
   const defaultBadgeY = cy + markerRadius + 14 * scaleFactor;
   const badgeY =
-    defaultBadgeY + badgeHeight / 2 > FB - 5 ? cy - markerRadius - 14 * scaleFactor : defaultBadgeY;
+    defaultBadgeY + badgeHeight / 2 > pitchBounds.bottom - 5
+      ? cy - markerRadius - 14 * scaleFactor
+      : defaultBadgeY;
   const badgeX = Math.max(
-    FL + badgeWidth / 2 + 4,
-    Math.min(FR - badgeWidth / 2 - 4, cx)
+    pitchBounds.left + badgeWidth / 2 + 4,
+    Math.min(pitchBounds.right - badgeWidth / 2 - 4, cx)
   );
 
   return (
@@ -461,10 +475,11 @@ export default function PlayerMarker({
           const direction = DIRECTIONS.find((item) => item.key === player.direction);
           if (!direction) return null;
 
-          const startX = cx + direction.dx * (markerRadius + 4);
-          const startY = cy + direction.dy * (markerRadius + 4);
-          const endX = cx + direction.dx * (markerRadius + directionArrowLength);
-          const endY = cy + direction.dy * (markerRadius + directionArrowLength);
+          const displayVector = vectorToDisplay(direction.dx, direction.dy, pitchOrientation);
+          const startX = cx + displayVector.dx * (markerRadius + 4);
+          const startY = cy + displayVector.dy * (markerRadius + 4);
+          const endX = cx + displayVector.dx * (markerRadius + directionArrowLength);
+          const endY = cy + displayVector.dy * (markerRadius + directionArrowLength);
           const markerId = `dir-${player.id}`;
 
           return (

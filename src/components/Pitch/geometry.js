@@ -10,6 +10,14 @@ export function getPitchTransform(orientation = 'vertical') {
   return orientation === 'horizontal' ? `translate(${PITCH_H} 0) rotate(90)` : undefined;
 }
 
+export function canonicalToDisplayPoint(x, y, orientation = 'vertical') {
+  if (orientation === 'horizontal') {
+    return { x: PITCH_H - y, y: x };
+  }
+
+  return { x, y };
+}
+
 export function svgToCanonicalPoint(x, y, orientation = 'vertical') {
   if (orientation === 'horizontal') {
     return { x: y, y: PITCH_H - x };
@@ -43,4 +51,32 @@ export function canonicalToPercent(x, y) {
     x: ((x - FL) / FW) * 100,
     y: ((y - FT) / FH) * 100,
   };
+}
+
+export function pitchPercentToDisplayPoint(x, y, orientation = 'vertical') {
+  return canonicalToDisplayPoint(FL + (x / 100) * FW, FT + (y / 100) * FH, orientation);
+}
+
+export function getDisplayPitchBounds(orientation = 'vertical') {
+  const corners = [
+    canonicalToDisplayPoint(FL, FT, orientation),
+    canonicalToDisplayPoint(FR, FT, orientation),
+    canonicalToDisplayPoint(FL, FB, orientation),
+    canonicalToDisplayPoint(FR, FB, orientation),
+  ];
+
+  return {
+    left: Math.min(...corners.map((corner) => corner.x)),
+    right: Math.max(...corners.map((corner) => corner.x)),
+    top: Math.min(...corners.map((corner) => corner.y)),
+    bottom: Math.max(...corners.map((corner) => corner.y)),
+  };
+}
+
+export function vectorToDisplay(dx, dy, orientation = 'vertical') {
+  if (orientation === 'horizontal') {
+    return { dx: -dy, dy: dx };
+  }
+
+  return { dx, dy };
 }
