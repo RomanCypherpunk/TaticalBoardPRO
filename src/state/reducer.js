@@ -1,4 +1,31 @@
 import FORMATIONS from '../data/formations';
+import initialState from './initialState';
+
+function mergeLoadedState(loadedState) {
+  const baseState = initialState();
+
+  return {
+    ...baseState,
+    ...loadedState,
+    teams: {
+      home: {
+        ...baseState.teams.home,
+        ...loadedState?.teams?.home,
+        players: loadedState?.teams?.home?.players || baseState.teams.home.players,
+      },
+      away: {
+        ...baseState.teams.away,
+        ...loadedState?.teams?.away,
+        players: loadedState?.teams?.away?.players || baseState.teams.away.players,
+      },
+    },
+    arrows: Array.isArray(loadedState?.arrows) ? loadedState.arrows : baseState.arrows,
+    ui: {
+      ...baseState.ui,
+      ...loadedState?.ui,
+    },
+  };
+}
 
 export default function reducer(state, action) {
   switch (action.type) {
@@ -195,7 +222,7 @@ export default function reducer(state, action) {
     }
 
     case 'LOAD_STATE':
-      return action.state;
+      return mergeLoadedState(action.state);
 
     default:
       return state;

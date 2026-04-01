@@ -51,6 +51,7 @@ export default function initialState() {
     arrows: [],
     ui: {
       viewMode: 'number',
+      pitchOrientation: 'horizontal',
       selectedPlayer: null,
       selectedTeam: 'home',
       pitchStyle: 'green',

@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FB, FH, FL, FR, FT, FW, pctToSvg } from './constants';
+import { FB, FL, FR, pctToSvg } from './constants';
+import { canonicalToPercent, clampToPitch, eventToCanonicalPoint } from './geometry';
 import DIRECTIONS from '../../data/directions';
 import { buildFotmobPlayerPhotoUrl } from '../../utils/fotmob';
 
-const RADIUS = 24;
-const DIRECTION_ARROW_LENGTH = 38;
+const BASE_RADIUS = 24;
+const PHOTO_RADIUS = BASE_RADIUS * 2;
+const BASE_DIRECTION_ARROW_LENGTH = 38;
 
-function InlinePatternDefs({ patternKey, primaryColor, secondaryColor, cx, cy, id }) {
+function InlinePatternDefs({ patternKey, primaryColor, secondaryColor, cx, cy, id, radius }) {
   if (!patternKey || patternKey === 'solid') return null;
 
-  const boxX = cx - RADIUS;
-  const boxY = cy - RADIUS;
-  const size = RADIUS * 2;
+  const boxX = cx - radius;
+  const boxY = cy - radius;
+  const size = radius * 2;
 
   let content;
 
@@ -180,8 +182,8 @@ function getPlayerInitials(name) {
   return `${tokens[0][0]}${tokens[tokens.length - 1][0]}`.toUpperCase();
 }
 
-function getNameBadgeText(name) {
-  return String(name || '').trim().toUpperCase();
+function getInfoBadgeText(value) {
+  return String(value || '').trim().toUpperCase();
 }
 
 export default function PlayerMarker({
@@ -189,6 +191,7 @@ export default function PlayerMarker({
   team,
   teamId,
   viewMode,
+  pitchOrientation,
   isSelected,
   onSelect,
   onDragEnd,
@@ -206,6 +209,10 @@ export default function PlayerMarker({
 
   const cx = dragging && dragPos ? dragPos.x : sx;
   const cy = dragging && dragPos ? dragPos.y : sy;
+  const markerRadius = viewMode === 'photo' ? PHOTO_RADIUS : BASE_RADIUS;
+  const scaleFactor = markerRadius / BASE_RADIUS;
+  const directionArrowLength =
+    viewMode === 'photo' ? BASE_DIRECTION_ARROW_LENGTH * 1.6 : BASE_DIRECTION_ARROW_LENGTH;
 
   const patternId = `pattern-${teamId}-${player.id}`;
   const photoClipId = `photo-clip-${teamId}-${player.id}`;
@@ -238,17 +245,15 @@ export default function PlayerMarker({
 
       event.preventDefault();
       const svg = svgRef.current;
-      const point = svg.createSVGPoint();
-      point.x = event.clientX;
-      point.y = event.clientY;
-      const svgPoint = point.matrixTransform(svg.getScreenCTM().inverse());
+      const { x, y } = eventToCanonicalPoint(svg, event, pitchOrientation);
+      const nextPoint = clampToPitch(x, y, markerRadius);
 
       setDragPos({
-        x: Math.max(FL + RADIUS, Math.min(FR - RADIUS, svgPoint.x)),
-        y: Math.max(FT + RADIUS, Math.min(FB - RADIUS, svgPoint.y)),
+        x: nextPoint.x,
+        y: nextPoint.y,
       });
     },
-    [dragging]
+    [dragging, markerRadius, pitchOrientation]
   );
 
   const handlePointerUp = useCallback(() => {
@@ -257,8 +262,7 @@ export default function PlayerMarker({
     setDragging(false);
 
     if (dragPos) {
-      const percentX = ((dragPos.x - FL) / FW) * 100;
-      const percentY = ((dragPos.y - FT) / FH) * 100;
+      const { x: percentX, y: percentY } = canonicalToPercent(dragPos.x, dragPos.y);
       onDragEnd(Math.round(percentX * 10) / 10, Math.round(percentY * 10) / 10);
     }
 
@@ -266,33 +270,32 @@ export default function PlayerMarker({
   }, [dragging, dragPos, onDragEnd]);
 
   let markerText = String(player.number);
-  let markerFontSize = 17;
+  let markerFontSize = 17 * scaleFactor;
   let markerWeight = 800;
-  let showNameBadge = false;
+  let infoBadgeText = '';
 
   if (viewMode === 'name') {
-    markerText = getPlayerInitials(player.name);
-    markerFontSize = 14;
-    markerWeight = 700;
-    showNameBadge = true;
+    infoBadgeText = getInfoBadgeText(player.name);
   } else if (viewMode === 'position') {
-    markerText = player.position;
-    markerFontSize = player.position.length >= 3 ? 12.5 : 14.5;
-    markerWeight = 800;
+    infoBadgeText = getInfoBadgeText(player.position);
   } else if (viewMode === 'photo' && !showPhoto) {
     markerText = getPlayerInitials(player.name);
-    markerFontSize = 14;
+    markerFontSize = 14 * scaleFactor;
     markerWeight = 700;
   }
 
-  const nameBadgeText = getNameBadgeText(player.name);
-  const charWidth = 6.6;
-  const badgePadding = 8;
-  const badgeWidth = nameBadgeText.length * charWidth + badgePadding * 2;
-  const badgeHeight = 18;
-  const defaultBadgeY = cy + RADIUS + 14;
+  const showInfoBadge = Boolean(infoBadgeText);
+  const charWidth = 6.6 * scaleFactor;
+  const badgePadding = 8 * scaleFactor;
+  const badgeWidth = Math.max(infoBadgeText.length * charWidth + badgePadding * 2, markerRadius * 2.5);
+  const badgeHeight = 18 * scaleFactor;
+  const defaultBadgeY = cy + markerRadius + 14 * scaleFactor;
   const badgeY =
-    defaultBadgeY + badgeHeight / 2 > FB - 5 ? cy - RADIUS - 14 : defaultBadgeY;
+    defaultBadgeY + badgeHeight / 2 > FB - 5 ? cy - markerRadius - 14 * scaleFactor : defaultBadgeY;
+  const badgeX = Math.max(
+    FL + badgeWidth / 2 + 4,
+    Math.min(FR - badgeWidth / 2 - 4, cx)
+  );
 
   return (
     <g
@@ -315,36 +318,37 @@ export default function PlayerMarker({
           cx={cx}
           cy={cy}
           id={patternId}
+          radius={markerRadius}
         />
       )}
 
       {showPhoto && (
         <defs>
           <clipPath id={photoClipId}>
-            <circle cx={cx} cy={cy} r={RADIUS} />
+            <circle cx={cx} cy={cy} r={markerRadius} />
           </clipPath>
         </defs>
       )}
 
-      <circle cx={cx + 2} cy={cy + 3} r={RADIUS} fill="rgba(0,0,0,0.35)" />
+      <circle cx={cx + 2} cy={cy + 3} r={markerRadius} fill="rgba(0,0,0,0.35)" />
 
       {isSelected && (
-        <circle cx={cx} cy={cy} r={RADIUS + 6} fill="none" stroke="rgba(20,201,107,0.72)" strokeWidth="2.5">
-          <animate attributeName="r" values={`${RADIUS + 4};${RADIUS + 10};${RADIUS + 4}`} dur="1.2s" repeatCount="indefinite" />
+        <circle cx={cx} cy={cy} r={markerRadius + 6} fill="none" stroke="rgba(20,201,107,0.72)" strokeWidth="2.5">
+          <animate attributeName="r" values={`${markerRadius + 4};${markerRadius + 10};${markerRadius + 4}`} dur="1.2s" repeatCount="indefinite" />
           <animate attributeName="opacity" values="0.7;0.2;0.7" dur="1.2s" repeatCount="indefinite" />
         </circle>
       )}
 
-      <circle cx={cx} cy={cy} r={RADIUS} fill={showPhoto ? '#08120D' : fillColor} stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
+      <circle cx={cx} cy={cy} r={markerRadius} fill={showPhoto ? '#08120D' : fillColor} stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
 
       {showPhoto && (
         <image
           href={photoUrl}
           xlinkHref={photoUrl}
-          x={cx - RADIUS}
-          y={cy - RADIUS}
-          width={RADIUS * 2}
-          height={RADIUS * 2}
+          x={cx - markerRadius}
+          y={cy - markerRadius}
+          width={markerRadius * 2}
+          height={markerRadius * 2}
           clipPath={`url(#${photoClipId})`}
           preserveAspectRatio="xMidYMid slice"
           imageRendering="auto"
@@ -353,7 +357,7 @@ export default function PlayerMarker({
       )}
 
       {player.isKeyPlayer && (
-        <circle cx={cx} cy={cy} r={RADIUS + 2} fill="none" stroke="#FFD700" strokeWidth="2" opacity="0.7">
+        <circle cx={cx} cy={cy} r={markerRadius + 2} fill="none" stroke="#FFD700" strokeWidth="2" opacity="0.7">
           <animate attributeName="opacity" values="0.7;0.3;0.7" dur="2s" repeatCount="indefinite" />
         </circle>
       )}
@@ -377,20 +381,20 @@ export default function PlayerMarker({
       {showPhoto && (
         <g style={{ pointerEvents: 'none' }}>
           <circle
-            cx={cx + RADIUS * 0.82}
-            cy={cy + RADIUS * 0.76}
-            r={9}
+            cx={cx + markerRadius * 0.82}
+            cy={cy + markerRadius * 0.76}
+            r={markerRadius * 0.375}
             fill={team.primaryColor}
             stroke="rgba(0,0,0,0.35)"
             strokeWidth="1"
           />
           <text
-            x={cx + RADIUS * 0.8}
-            y={cy + RADIUS * 0.75}
+            x={cx + markerRadius * 0.8}
+            y={cy + markerRadius * 0.75}
             textAnchor="middle"
             dominantBaseline="central"
             fill={textColor}
-            fontSize="10"
+            fontSize={markerRadius * 0.42}
             fontWeight="800"
             fontFamily="Sora, sans-serif"
           >
@@ -402,20 +406,20 @@ export default function PlayerMarker({
       {player.isCaptain && (
         <g>
           <circle
-            cx={cx + RADIUS * 0.72}
-            cy={cy - RADIUS * 0.72}
-            r={8}
+            cx={cx + markerRadius * 0.72}
+            cy={cy - markerRadius * 0.72}
+            r={markerRadius / 3}
             fill="#FFD700"
             stroke="rgba(0,0,0,0.3)"
             strokeWidth="1"
           />
           <text
-            x={cx + RADIUS * 0.72}
-            y={cy - RADIUS * 0.72}
+            x={cx + markerRadius * 0.72}
+            y={cy - markerRadius * 0.72}
             textAnchor="middle"
             dominantBaseline="central"
             fill="#000"
-            fontSize="9"
+            fontSize={markerRadius * 0.38}
             fontWeight="900"
             fontFamily="Sora, sans-serif"
             style={{ pointerEvents: 'none' }}
@@ -425,10 +429,10 @@ export default function PlayerMarker({
         </g>
       )}
 
-      {showNameBadge && (
+      {showInfoBadge && (
         <g style={{ pointerEvents: 'none', userSelect: 'none' }}>
           <rect
-            x={cx - badgeWidth / 2}
+            x={badgeX - badgeWidth / 2}
             y={badgeY - badgeHeight / 2}
             width={badgeWidth}
             height={badgeHeight}
@@ -437,17 +441,17 @@ export default function PlayerMarker({
             opacity={0.94}
           />
           <text
-            x={cx}
+            x={badgeX}
             y={badgeY}
             textAnchor="middle"
             dominantBaseline="central"
-            fontSize={10.5}
+            fontSize={10.5 * scaleFactor}
             fontWeight="700"
             fontFamily="Sora, sans-serif"
             fill={textColor}
             letterSpacing="0.3"
           >
-            {nameBadgeText}
+            {infoBadgeText}
           </text>
         </g>
       )}
@@ -457,10 +461,10 @@ export default function PlayerMarker({
           const direction = DIRECTIONS.find((item) => item.key === player.direction);
           if (!direction) return null;
 
-          const startX = cx + direction.dx * (RADIUS + 4);
-          const startY = cy + direction.dy * (RADIUS + 4);
-          const endX = cx + direction.dx * (RADIUS + DIRECTION_ARROW_LENGTH);
-          const endY = cy + direction.dy * (RADIUS + DIRECTION_ARROW_LENGTH);
+          const startX = cx + direction.dx * (markerRadius + 4);
+          const startY = cy + direction.dy * (markerRadius + 4);
+          const endX = cx + direction.dx * (markerRadius + directionArrowLength);
+          const endY = cy + direction.dy * (markerRadius + directionArrowLength);
           const markerId = `dir-${player.id}`;
 
           return (
@@ -484,7 +488,7 @@ export default function PlayerMarker({
                 x2={endX}
                 y2={endY}
                 stroke={team.primaryColor}
-                strokeWidth="2.5"
+                strokeWidth={2.5 * scaleFactor}
                 opacity="0.85"
                 markerEnd={`url(#${markerId})`}
               />

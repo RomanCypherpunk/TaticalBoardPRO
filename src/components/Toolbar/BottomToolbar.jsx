@@ -6,6 +6,7 @@ import {
   MapPin,
   MousePointer,
   Pencil,
+  RotateCw,
   RotateCcw,
   Trash2,
   Type,
@@ -29,6 +30,11 @@ const ARROW_TYPES = Object.entries(ARROW_STYLES).map(([type, style]) => ({
   label: style.label,
   color: style.defaultColor,
 }));
+
+const PITCH_ORIENTATIONS = [
+  { mode: 'horizontal', label: 'Horizontal' },
+  { mode: 'vertical', label: 'Vertical' },
+];
 
 /**
  * Bottom toolbar with player view modes, pitch theme, arrows and actions.
@@ -137,6 +143,26 @@ export default function BottomToolbar({ ui, dispatch }) {
           </button>
         </>
       )}
+
+      <Divider />
+
+      <div className="flex items-center gap-0.5 rounded-xl bg-white/5 p-0.5">
+        {PITCH_ORIENTATIONS.map(({ mode, label }) => (
+          <button
+            key={mode}
+            className="flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs transition-all duration-200"
+            style={{
+              background: ui.pitchOrientation === mode ? 'var(--accent)' : 'transparent',
+              color: ui.pitchOrientation === mode ? '#fff' : 'var(--text-secondary)',
+            }}
+            onClick={() => setUI({ pitchOrientation: mode })}
+            title={`Campo ${label.toLowerCase()}`}
+          >
+            <RotateCw size={13} />
+            {label}
+          </button>
+        ))}
+      </div>
 
       <Divider />
 

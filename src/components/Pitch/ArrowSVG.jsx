@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import ARROW_STYLES from '../../data/arrowStyles';
-import { pctToSvg, FL, FT, FW, FH, FR, FB } from './constants';
+import { pctToSvg } from './constants';
+import { canonicalToPercent, clampToPitch, eventToCanonicalPoint } from './geometry';
 
 const HANDLE_R = 8;
 
@@ -8,7 +9,7 @@ const HANDLE_R = 8;
  * Renders a single tactical arrow on the SVG pitch.
  * Supports selection, drag-to-move endpoints, and removal.
  */
-export default function ArrowSVG({ arrow, isSelected, dispatch }) {
+export default function ArrowSVG({ arrow, isSelected, dispatch, pitchOrientation }) {
   const style = ARROW_STYLES[arrow.type] || ARROW_STYLES.run;
   const { sx: x1, sy: y1 } = pctToSvg(arrow.fromX, arrow.fromY);
   const { sx: x2, sy: y2 } = pctToSvg(arrow.toX, arrow.toY);
@@ -43,12 +44,9 @@ export default function ArrowSVG({ arrow, isSelected, dispatch }) {
 
     const handleMove = (me) => {
       if (!svgRef.current) return;
-      const pt = svgRef.current.createSVGPoint();
-      pt.x = me.clientX;
-      pt.y = me.clientY;
-      const svgP = pt.matrixTransform(svgRef.current.getScreenCTM().inverse());
-      const px = Math.max(0, Math.min(100, ((svgP.x - FL) / FW) * 100));
-      const py = Math.max(0, Math.min(100, ((svgP.y - FT) / FH) * 100));
+      const { x, y } = eventToCanonicalPoint(svgRef.current, me, pitchOrientation);
+      const nextPoint = clampToPitch(x, y);
+      const { x: px, y: py } = canonicalToPercent(nextPoint.x, nextPoint.y);
 
       if (endpoint === 'from') {
         dispatch({ type: 'UPDATE_ARROW', arrowId: arrow.id, updates: { fromX: px, fromY: py } });
@@ -57,8 +55,8 @@ export default function ArrowSVG({ arrow, isSelected, dispatch }) {
       } else {
         // Move entire arrow (body drag)
         const orig = dragStart.current;
-        const dx = px - ((svgP.x - FL) / FW) * 100;
-        const dy = py - ((svgP.y - FT) / FH) * 100;
+        const dx = px - canonicalToPercent(x, y).x;
+        const dy = py - canonicalToPercent(x, y).y;
         // For body drag we calculate offset from initial pointer position
       }
     };
@@ -71,7 +69,7 @@ export default function ArrowSVG({ arrow, isSelected, dispatch }) {
 
     window.addEventListener('pointermove', handleMove);
     window.addEventListener('pointerup', handleUp);
-  }, [arrow, dispatch]);
+  }, [arrow, dispatch, pitchOrientation]);
 
   const lineProps = {
     stroke: color,

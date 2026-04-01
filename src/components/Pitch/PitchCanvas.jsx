@@ -4,13 +4,24 @@ import PlayerMarker from './PlayerMarker';
 import ArrowSVG from './ArrowSVG';
 import ShirtPatternDefs from './ShirtPatternDefs';
 import ARROW_STYLES from '../../data/arrowStyles';
-import { PITCH_W, PITCH_H, FL, FT, FW, FH } from './constants';
+import { FL, FT, FW, FH } from './constants';
+import {
+  canonicalToPercent,
+  eventToCanonicalPoint,
+  getPitchTransform,
+  getPitchViewport,
+  isInsidePitch,
+} from './geometry';
 
 /**
  * The main pitch area — composes the SVG field, players, arrows, and shirt patterns.
  * Handles arrow drawing, selection, and deletion.
  */
 export default function PitchCanvas({ teams, arrows, ui, dispatch, svgRef }) {
+  const pitchOrientation = ui.pitchOrientation || 'horizontal';
+  const { width: viewWidth, height: viewHeight, aspectRatio } = getPitchViewport(pitchOrientation);
+  const pitchTransform = getPitchTransform(pitchOrientation);
+
   const handlePitchClick = useCallback(
     (e) => {
       // Deselect arrow if clicking on empty pitch
@@ -21,13 +32,10 @@ export default function PitchCanvas({ teams, arrows, ui, dispatch, svgRef }) {
       if (!ui.arrowMode) return;
       const svg = svgRef.current;
       if (!svg) return;
-      const pt = svg.createSVGPoint();
-      pt.x = e.clientX;
-      pt.y = e.clientY;
-      const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
-      const px = ((svgP.x - FL) / FW) * 100;
-      const py = ((svgP.y - FT) / FH) * 100;
-      if (px < 0 || px > 100 || py < 0 || py > 100) return;
+      const { x, y } = eventToCanonicalPoint(svg, e, pitchOrientation);
+      if (!isInsidePitch(x, y)) return;
+
+      const { x: px, y: py } = canonicalToPercent(x, y);
 
       if (!ui.arrowDrawing) {
         dispatch({ type: 'SET_UI', updates: { arrowDrawing: { fromX: px, fromY: py } } });
@@ -48,7 +56,7 @@ export default function PitchCanvas({ teams, arrows, ui, dispatch, svgRef }) {
         dispatch({ type: 'SET_UI', updates: { arrowDrawing: null } });
       }
     },
-    [ui.arrowMode, ui.arrowDrawing, ui.selectedArrow, dispatch, svgRef]
+    [ui.arrowMode, ui.arrowDrawing, ui.selectedArrow, dispatch, pitchOrientation, svgRef]
   );
 
   const selectPlayer = (teamId, playerId) => {
@@ -81,85 +89,98 @@ export default function PitchCanvas({ teams, arrows, ui, dispatch, svgRef }) {
       <div
         className="max-h-full max-w-full"
         style={{
-          aspectRatio: `${PITCH_W} / ${PITCH_H}`,
-          height: '100%',
+          aspectRatio,
+          width: pitchOrientation === 'horizontal' ? '100%' : 'auto',
+          height: pitchOrientation === 'vertical' ? '100%' : 'auto',
         }}
       >
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${PITCH_W} ${PITCH_H}`}
+          viewBox={`0 0 ${viewWidth} ${viewHeight}`}
           preserveAspectRatio="xMidYMid meet"
           className="h-full w-full"
           style={{ filter: 'drop-shadow(0 4px 24px rgba(0,0,0,0.4))' }}
           onClick={handlePitchClick}
         >
-          <PitchSVG theme={ui.pitchStyle} />
-
-          {/* Shirt pattern definitions */}
-          <ShirtPatternDefs teamId="home" primaryColor={teams.home.primaryColor}
-            secondaryColor={teams.home.secondaryColor} pattern={teams.home.pattern} />
+          <ShirtPatternDefs
+            teamId="home"
+            primaryColor={teams.home.primaryColor}
+            secondaryColor={teams.home.secondaryColor}
+            pattern={teams.home.pattern}
+          />
           {showAway && (
-            <ShirtPatternDefs teamId="away" primaryColor={teams.away.primaryColor}
-              secondaryColor={teams.away.secondaryColor} pattern={teams.away.pattern} />
+            <ShirtPatternDefs
+              teamId="away"
+              primaryColor={teams.away.primaryColor}
+              secondaryColor={teams.away.secondaryColor}
+              pattern={teams.away.pattern}
+            />
           )}
 
-          {/* Tactical arrows */}
-          {arrows.map((a) => (
-            <ArrowSVG
-              key={a.id}
-              arrow={a}
-              isSelected={ui.selectedArrow === a.id}
-              dispatch={dispatch}
-            />
-          ))}
+          <g transform={pitchTransform}>
+            <PitchSVG theme={ui.pitchStyle} />
 
-          {/* Arrow drawing preview dot */}
-          {ui.arrowDrawing && (
-            <circle
-              cx={FL + (ui.arrowDrawing.fromX / 100) * FW}
-              cy={FT + (ui.arrowDrawing.fromY / 100) * FH}
-              r={6}
-              fill={ARROW_STYLES[ui.arrowMode]?.defaultColor || '#FFD700'}
-              opacity="0.8"
-            >
-              <animate attributeName="r" values="5;8;5" dur="0.8s" repeatCount="indefinite" />
-            </circle>
-          )}
+            {/* Tactical arrows */}
+            {arrows.map((a) => (
+              <ArrowSVG
+                key={a.id}
+                arrow={a}
+                isSelected={ui.selectedArrow === a.id}
+                dispatch={dispatch}
+                pitchOrientation={pitchOrientation}
+              />
+            ))}
 
-          {/* Home players */}
-          {teams.home.players.map((player) => (
-            <PlayerMarker
-              key={player.id}
-              player={player}
-              team={teams.home}
-              teamId="home"
-              viewMode={ui.viewMode}
-              isSelected={ui.selectedPlayer?.id === player.id && ui.selectedPlayer?.teamId === 'home'}
-              onSelect={() => selectPlayer('home', player.id)}
-              onOpenEditor={() => openEditor('home', player.id)}
-              onDragEnd={(x, y) =>
-                dispatch({ type: 'MOVE_PLAYER', teamId: 'home', playerId: player.id, x, y })
-              }
-            />
-          ))}
+            {/* Arrow drawing preview dot */}
+            {ui.arrowDrawing && (
+              <circle
+                cx={FL + (ui.arrowDrawing.fromX / 100) * FW}
+                cy={FT + (ui.arrowDrawing.fromY / 100) * FH}
+                r={6}
+                fill={ARROW_STYLES[ui.arrowMode]?.defaultColor || '#FFD700'}
+                opacity="0.8"
+              >
+                <animate attributeName="r" values="5;8;5" dur="0.8s" repeatCount="indefinite" />
+              </circle>
+            )}
 
-          {/* Away players */}
-          {showAway &&
-            teams.away.players.map((player) => (
+            {/* Home players */}
+            {teams.home.players.map((player) => (
               <PlayerMarker
                 key={player.id}
                 player={player}
-                team={teams.away}
-                teamId="away"
+                team={teams.home}
+                teamId="home"
                 viewMode={ui.viewMode}
-                isSelected={ui.selectedPlayer?.id === player.id && ui.selectedPlayer?.teamId === 'away'}
-                onSelect={() => selectPlayer('away', player.id)}
-                onOpenEditor={() => openEditor('away', player.id)}
+                pitchOrientation={pitchOrientation}
+                isSelected={ui.selectedPlayer?.id === player.id && ui.selectedPlayer?.teamId === 'home'}
+                onSelect={() => selectPlayer('home', player.id)}
+                onOpenEditor={() => openEditor('home', player.id)}
                 onDragEnd={(x, y) =>
-                  dispatch({ type: 'MOVE_PLAYER', teamId: 'away', playerId: player.id, x, y })
+                  dispatch({ type: 'MOVE_PLAYER', teamId: 'home', playerId: player.id, x, y })
                 }
               />
             ))}
+
+            {/* Away players */}
+            {showAway &&
+              teams.away.players.map((player) => (
+                <PlayerMarker
+                  key={player.id}
+                  player={player}
+                  team={teams.away}
+                  teamId="away"
+                  viewMode={ui.viewMode}
+                  pitchOrientation={pitchOrientation}
+                  isSelected={ui.selectedPlayer?.id === player.id && ui.selectedPlayer?.teamId === 'away'}
+                  onSelect={() => selectPlayer('away', player.id)}
+                  onOpenEditor={() => openEditor('away', player.id)}
+                  onDragEnd={(x, y) =>
+                    dispatch({ type: 'MOVE_PLAYER', teamId: 'away', playerId: player.id, x, y })
+                  }
+                />
+              ))}
+          </g>
         </svg>
       </div>
     </div>
