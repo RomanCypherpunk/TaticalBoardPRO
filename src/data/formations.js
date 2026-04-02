@@ -1,4 +1,4 @@
-import { mapGridToPosition } from './gridPositionMap.js';
+import { mapGridToPosition } from './gridPositionMap';
 
 export const FORMATION_KEYS = [
   '4-3-3',
@@ -9,22 +9,14 @@ export const FORMATION_KEYS = [
   '4-2-2-2',
   '4-2-4',
   '3-4-3',
-  '3-1-2-1-3',
   '3-4-2-1',
   '3-5-2',
   '3-2-2-3',
   '5-4-1',
   '5-3-2',
   '5-2-3',
+  '3-1-2-1-3',
 ];
-
-export const FORMATION_LABELS = {
-  '3-1-2-1-3': '3-4-3 (Losango)',
-};
-
-export function getFormationLabel(formation) {
-  return FORMATION_LABELS[formation] || formation;
-}
 
 const FORMATION_ROW_ROLES = {
   '4-3-3': ['defense', 'midfield', 'attack'],
@@ -35,13 +27,13 @@ const FORMATION_ROW_ROLES = {
   '4-2-2-2': ['defense', 'midfield', 'attackMid', 'attack'],
   '4-2-4': ['defense', 'midfield', 'attack'],
   '3-4-3': ['defense', 'midfield', 'attack'],
-  '3-1-2-1-3': ['defense', 'midfield', 'midfield', 'attackMid', 'attack'],
   '3-4-2-1': ['defense', 'midfield', 'attackMid', 'attack'],
   '3-5-2': ['defense', 'midfield', 'attack'],
   '3-2-2-3': ['defense', 'midfield', 'attackMid', 'attack'],
   '5-4-1': ['defense', 'midfield', 'attack'],
   '5-3-2': ['defense', 'midfield', 'attack'],
   '5-2-3': ['defense', 'midfield', 'attack'],
+  '3-1-2-1-3': ['defense', 'midfield', 'midfield', 'attackMid', 'attack'],
 };
 
 const ROW_X_MAPS = {

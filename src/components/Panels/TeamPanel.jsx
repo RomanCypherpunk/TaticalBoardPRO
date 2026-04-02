@@ -7,10 +7,14 @@ import {
   Shield,
   Star,
 } from 'lucide-react';
-import FORMATIONS, { FORMATION_KEYS, getFormationLabel } from '../../data/formations';
+import FORMATIONS, { FORMATION_KEYS } from '../../data/formations';
 import SHIRT_PATTERNS from '../../data/shirtPatterns';
 
 const formationKeys = FORMATION_KEYS.filter((formation) => FORMATIONS[formation]);
+
+const FORMATION_LABELS = {
+  '3-1-2-1-3': '3-1-2-1-3 (Cruyff)',
+};
 
 const SELECT_STYLE = {
   backgroundColor: '#101F17',
@@ -144,7 +148,7 @@ export default function TeamPanel({ team, teamId, dispatch, selectedPlayer }) {
           >
             {formationKeys.map((formation) => (
               <option key={formation} value={formation} style={OPTION_STYLE}>
-                {getFormationLabel(formation)}
+                {FORMATION_LABELS[formation] ?? formation}
               </option>
             ))}
           </select>

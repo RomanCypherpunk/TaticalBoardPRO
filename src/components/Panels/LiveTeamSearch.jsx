@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { AlertCircle, Globe, Loader2, Search, X } from 'lucide-react';
 import TEAMS_DB from '../../data/teamsDatabase';
-import { getFormationLabel } from '../../data/formations';
 
 function normalizeKey(value) {
   return String(value || '')
@@ -283,7 +282,7 @@ export default function LiveTeamSearch({ teamId, dispatch, onClose }) {
                   <div className="text-xs text-txt-secondary">
                     Formacao:{' '}
                     <span className="font-semibold text-txt-primary">
-                      {getFormationLabel(lineup.team.formation)}
+                      {lineup.team.formation}
                     </span>
                   </div>
 

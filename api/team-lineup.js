@@ -1,6 +1,5 @@
 import { buildShortName, fotmobFetchJson } from './_fotmob.js';
-import FORMATIONS from '../src/data/formations.js';
-import { mapGridToPosition, resolveFormation } from '../src/data/gridPositionMap.js';
+import { mapGridToPosition } from '../src/data/gridPositionMap.js';
 
 /** FotMob positionId -> tactical abbreviation */
 const POSITION_ID_MAP = {
@@ -248,7 +247,7 @@ export default async function handler(req, res) {
     let isSquadFallback = false;
 
     if (lastLineup?.starters?.length) {
-      formation = resolveFormation(lastLineup.formation || formation, FORMATIONS);
+      formation = lastLineup.formation || formation;
       players = buildPlayersFromLastLineup(lastLineup.starters, formation);
     } else {
       players = buildSquadLineup(teamData?.squad?.squad);

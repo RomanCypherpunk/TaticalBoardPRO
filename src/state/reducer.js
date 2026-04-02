@@ -1,5 +1,4 @@
 import FORMATIONS from '../data/formations';
-import { resolveFormation } from '../data/gridPositionMap';
 import initialState, { orientFormationPosition } from './initialState';
 
 const POSITION_PREFERENCES = {
@@ -283,7 +282,7 @@ export default function reducer(state, action) {
     case 'LOAD_LIVE_TEAM': {
       const { teamId, teamData, players: apiPlayers } = action;
       const isAway = teamId === 'away';
-      const resolvedFormation = resolveFormation(teamData.formation || '4-3-3', FORMATIONS);
+      const resolvedFormation = FORMATIONS[teamData.formation] ? teamData.formation : '4-3-3';
       const f = FORMATIONS[resolvedFormation];
       const idOffset = isAway ? 100 : 0;
       const orderedApiPlayers = orderPlayersForFormation(apiPlayers, resolvedFormation);
